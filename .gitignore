@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environment
+.env
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data (large files — keep structure, ignore content)
+data/prompts/*.json
+data/responses/*.json
+data/responses/*.jsonl
+data/annotations/*.json
+data/annotations/*.jsonl
+!data/prompts/.gitkeep
+!data/responses/.gitkeep
+!data/annotations/.gitkeep
+
+# Notebooks
+notebooks/.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# API keys
+*.key
+*.secret

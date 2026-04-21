@@ -1,0 +1,68 @@
+# Model configurations for the refusal framing study
+# Models are selected to cover: base vs instruct vs RLHF, open vs closed, multiple families
+
+api_models:
+  gpt-4o:
+    provider: openai
+    model_id: gpt-4o
+    type: closed-source
+    purpose: SOTA baseline
+    max_tokens: 1024
+    temperature: 0.0
+
+  claude-3-haiku:
+    provider: anthropic
+    model_id: claude-3-haiku-20240307
+    type: closed-source
+    purpose: Cross-provider comparison
+    max_tokens: 1024
+    temperature: 0.0
+
+local_models:
+  llama-3.1-8b-base:
+    model_id: meta-llama/Meta-Llama-3.1-8B
+    type: base
+    purpose: Pre-alignment baseline (Cameron sub-question b)
+    max_tokens: 1024
+    temperature: 0.0
+    gpu_memory_utilization: 0.85
+
+  llama-3.1-8b-instruct:
+    model_id: meta-llama/Meta-Llama-3.1-8B-Instruct
+    type: instruct
+    purpose: Post-instruction-tuning comparison
+    max_tokens: 1024
+    temperature: 0.0
+    gpu_memory_utilization: 0.85
+
+  qwen2.5-7b-instruct:
+    model_id: Qwen/Qwen2.5-7B-Instruct
+    type: instruct
+    purpose: Cross-family comparison
+    max_tokens: 1024
+    temperature: 0.0
+    gpu_memory_utilization: 0.85
+
+  gemma-2-9b-it:
+    model_id: google/gemma-2-9b-it
+    type: instruct
+    purpose: Cross-family comparison
+    max_tokens: 1024
+    temperature: 0.0
+    gpu_memory_utilization: 0.85
+
+# Judge models
+judge:
+  layer0:
+    model_id: gpt-4o-mini
+    purpose: FC/PC/NC classification (cost-effective)
+  layer12:
+    model_id: gpt-4o
+    purpose: Layer 1 + Layer 2 annotation (higher accuracy needed)
+
+# Benchmark configuration
+benchmark:
+  required_refusal: 100    # from SORRY-Bench, HarmBench
+  over_refusal: 100        # from OR-Bench, XSTest
+  context_sensitive: 100   # from WildChat (manually curated)
+  total: 300
