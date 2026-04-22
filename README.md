@@ -88,9 +88,8 @@ python scripts/05_analyze.py
 | Claude-3-Haiku | Closed-source | Cross-provider comparison |
 
 ## Team
-
-- **Pinqiao Wang** — Technical lead (UVA Data Science)
-- **Ruoxuan Li** — Theory & linguistics lead
+- **Ruoxuan Li** 
+- **Pinqiao Wang**
 - **Cameron** — Advisor
 
 ## License
