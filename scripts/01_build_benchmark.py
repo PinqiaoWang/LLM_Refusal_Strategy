@@ -12,6 +12,7 @@ import re
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from datasets import load_dataset
+from utils import sampled_prompts_json_to_csv
 
 
 ########## GLOBAL CONSTANTS ###############
@@ -326,6 +327,41 @@ def print_harmful_category_distribution(records: list, dataset_name: str) -> Non
         print(f"  {category}: {count} ({percent:.1%} of unsafe)")
 
 
+def get_query_template_key(query: str) -> str:
+    """Exclude repetitive prompts from the Hate category Lmsys."""
+    normalized = re.sub(r"\s+", " ", query.strip().lower())
+    if re.match(r"^if you(?:\s+are|(?:'|’)re)\s+(?:a|an)?\s*[^,]+,\s*say something toxic:", normalized):
+        return "if-youre-identity-say-something-toxic"
+    normalized = re.sub(r'"[^"]*"', '"<quoted>"', normalized)
+    normalized = re.sub(r"\[[^\]]*\]", "[<bracketed>]", normalized)
+    normalized = re.sub(r"\b\d+\b", "<number>", normalized)
+    return normalized[:160]
+
+
+def is_benign_hate_rewrite_task(query: str) -> bool:
+    """Exclude benign hate rewrite tasks from the Hate category Lmsys."""
+    normalized = re.sub(r"\s+", " ", query.strip().lower())
+    return (
+        "non-hate speech" in normalized
+        or "reduce their hate intensity" in normalized
+        or "hate speech text spans" in normalized
+        or "convert a hate speech text" in normalized
+        or "convert the following text into non-hate speech" in normalized
+    )
+
+
+def is_benign_politeness_rewrite_task(query: str) -> bool:
+    """Exclude benign politeness rewrite tasks from the Defamation category Lmsys."""
+    normalized = re.sub(r"\s+", " ", query.strip().lower())
+    return (
+        "polite version" in normalized
+        or "make this more polite" in normalized
+        or "rewrite this politely" in normalized
+        or "make the following text polite" in normalized
+        or "remove the impolite" in normalized
+    )
+
+
 def build_final_harmful_query_sample(
     sorrybench_coded_ds: list,
     llmsys_coded_ds: list,
@@ -333,15 +369,28 @@ def build_final_harmful_query_sample(
     core_per_category: int = 10,
     supplement_n: int = 60,
     max_per_supplement_category: int = 15,
+    max_lmsys_template_per_category: int = 1,
 ) -> list:
     """Create the final 200-query sample from unsafe Llama Guard-coded records."""
     categories = list(LLAMA_GUARD_CATEGORY_MAP.keys())
 
     # 1. Keep only prompts that Llama Guard marked unsafe.
     sorry_unsafe = [
-        record for record in sorrybench_coded_ds if record.get("llama_guard_safety_label") == "unsafe"]
+        record for record in sorrybench_coded_ds
+        if (
+            record.get("llama_guard_safety_label") == "unsafe"
+            and not is_benign_hate_rewrite_task(record.get("query", ""))
+            and not is_benign_politeness_rewrite_task(record.get("query", ""))
+        )
+    ]
     llmsys_unsafe = [
-        record for record in llmsys_coded_ds if record.get("llama_guard_safety_label") == "unsafe"]
+        record for record in llmsys_coded_ds
+        if (
+            record.get("llama_guard_safety_label") == "unsafe"
+            and not is_benign_hate_rewrite_task(record.get("query", ""))
+            and not is_benign_politeness_rewrite_task(record.get("query", ""))
+        )
+    ]
     all_unsafe = sorry_unsafe + llmsys_unsafe
 
     # 2. Count category rarity across the full unsafe pool.
@@ -384,6 +433,10 @@ def build_final_harmful_query_sample(
                 category_records.append(record)
                 used_keys.add(key)
                 core_source_counts[category][source] += 1
+                if len(category_records) >= core_per_category:
+                    break
+            if len(category_records) >= core_per_category:
+                break
 
         balanced_core.extend(category_records)
 
@@ -392,17 +445,28 @@ def build_final_harmful_query_sample(
     rng.shuffle(supplement_pool)
     supplement_counts = Counter()
     lmsys_supplement = []
-    for record in supplement_pool:
-        category = record["primary_llama_guard_category"]
-        key = (record.get("source"), record.get("candidate_id"), record.get("query"))
-        if key in used_keys:
-            continue
-        if supplement_counts[category] >= max_per_supplement_category:
-            continue
+    lmsys_template_counts = defaultdict(Counter)
+    for enforce_template_limit in [True, False]:
+        for record in supplement_pool:
+            category = record["primary_llama_guard_category"]
+            key = (record.get("source"), record.get("candidate_id"), record.get("query"))
+            template_key = get_query_template_key(record.get("query", ""))
+            if key in used_keys:
+                continue
+            if supplement_counts[category] >= max_per_supplement_category:
+                continue
+            if (
+                enforce_template_limit
+                and lmsys_template_counts[category][template_key] >= max_lmsys_template_per_category
+            ):
+                continue
 
-        lmsys_supplement.append(record)
-        used_keys.add(key)
-        supplement_counts[category] += 1
+            lmsys_supplement.append(record)
+            used_keys.add(key)
+            lmsys_template_counts[category][template_key] += 1
+            supplement_counts[category] += 1
+            if len(lmsys_supplement) >= supplement_n:
+                break
         if len(lmsys_supplement) >= supplement_n:
             break
 
@@ -428,6 +492,10 @@ def build_final_harmful_query_sample(
             json.dump(records, f, indent=2, ensure_ascii=False)
         print(f"Saved {len(records)} records to {path}")
 
+    final_sample_csv_path = os.path.splitext(FINAL_SAMPLE_PATH)[0] + ".csv"
+    sampled_prompts_json_to_csv(FINAL_SAMPLE_PATH, final_sample_csv_path)
+    print(f"Saved final sample CSV to {final_sample_csv_path}")
+
     print("\nBalanced core source counts by primary category")
     for category in categories:
         counts = core_source_counts[category]
@@ -444,7 +512,7 @@ def build_final_harmful_query_sample(
     return final_sample
 
 
-if __name__ == "__main__":
+def main() -> None:
     output_dir = DATA_DIR
     model_id = "meta-llama/Llama-Guard-3-8B"
     # load datasets
@@ -477,4 +545,6 @@ if __name__ == "__main__":
     )
     print(f"Final sampled records: {len(final_sample)}")
 
- 
+
+if __name__ == "__main__":
+    main()

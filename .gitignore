@@ -18,16 +18,6 @@ venv/
 *.swp
 *.swo
 
-# Data (large files — keep structure, ignore content)
-data/prompts/*.json
-data/responses/*.json
-data/responses/*.jsonl
-data/annotations/*.json
-data/annotations/*.jsonl
-!data/prompts/.gitkeep
-!data/responses/.gitkeep
-!data/annotations/.gitkeep
-
 # Notebooks
 notebooks/.ipynb_checkpoints/
 
