@@ -137,7 +137,7 @@ are organised as:
 # 1. Coverage
 
 ```{r coverage}
-cov <- df |>
+coverage_tbl <- df |>
   group_by(model) |>
   summarise(
     n_total     = n(),
@@ -148,7 +148,7 @@ cov <- df |>
   ) |>
   mutate(pct_judged = percent(n_judged / n_total, accuracy = 0.1))
 
-cov |>
+coverage_tbl |>
   kable(caption = "Per-model coverage. Skips here include upstream provider blocks (Gemini/Grok), Claude 4.6 refusal-stop signals, and transient inference failures.") |>
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
@@ -258,14 +258,14 @@ l2_tbl <- df_nc |>
 
 ggplot(l2_tbl, aes(feature, model, fill = rate)) +
   geom_tile(colour = "white", linewidth = 0.4) +
-  geom_text(aes(label = percent(rate, accuracy = 1)), size = 3) +
+  geom_text(aes(label = percent(rate, accuracy = 1)), size = 3, vjust = 1) +
   scale_fill_gradient(low = "#f7f7f7", high = "#08519c",
                       labels = percent_format(1), name = "Rate") +
   scale_x_discrete(position = "top") +
   labs(x = NULL, y = NULL,
        title = "L2 feature rates by model (within Non-compliance)") +
   theme_minimal(base_size = 11) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 0))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 ## 4.2 Feature-by-feature ranking
@@ -365,13 +365,91 @@ df_nc |>
   mutate(feature = factor(feature, levels = selected_features)) |>
   ggplot(aes(feature, primary_llama_guard_category_name, fill = rate)) +
     geom_tile(colour = "white", linewidth = 0.3) +
-    geom_text(aes(label = percent(rate, accuracy = 1)), size = 2.8) +
+    geom_text(aes(label = percent(rate, accuracy = 1)), size = 2.8, vjust = 1) +
     scale_fill_gradient(low = "#f7f7f7", high = "#08519c",
                         labels = percent_format(1)) +
     labs(x = NULL, y = NULL, fill = "Rate",
          title = "Selected L2 features × harm category") +
     theme_minimal(base_size = 10) +
     theme(axis.text.x = element_text(angle = 30, hjust = 1))
+```
+
+## 5.5 Full model × L2 feature × harm category
+
+Every cell is the rate of a given L2 feature among that model's NC responses
+within that harm category. Cells with fewer than `MIN_CELL_N` NC observations
+are masked to grey, because rates over very small denominators are not
+meaningful. Split across two figures to stay legible.
+
+```{r l2-mod-cat-prep}
+MIN_CELL_N <- 3
+
+l2_mod_cat <- df_nc |>
+  select(model,
+         category = primary_llama_guard_category_name,
+         all_of(L2_FEATURES)) |>
+  pivot_longer(-c(model, category), names_to = "feature", values_to = "value") |>
+  filter(!is.na(value)) |>
+  group_by(model, category, feature) |>
+  summarise(rate = mean(value), n = n(), .groups = "drop") |>
+  mutate(rate = if_else(n < MIN_CELL_N, NA_real_, rate),
+         feature = factor(feature, levels = L2_FEATURES))
+
+# Order categories by their pooled refusal rate (high → low) so the most
+# refusal-heavy categories appear first in the split.
+cat_order <- df_clean |>
+  group_by(primary_llama_guard_category_name) |>
+  summarise(rr = mean(layer0 == "Non-compliance"), .groups = "drop") |>
+  arrange(desc(rr)) |>
+  pull(primary_llama_guard_category_name)
+
+l2_mod_cat <- l2_mod_cat |>
+  mutate(category = factor(category, levels = cat_order))
+
+cat_part1 <- cat_order[1:7]
+cat_part2 <- cat_order[8:length(cat_order)]
+```
+
+```{r l2-mod-cat-plot-1, fig.height = 18, fig.width = 11}
+ggplot(filter(l2_mod_cat, category %in% cat_part1),
+       aes(feature, model, fill = rate)) +
+  geom_tile(colour = "white", linewidth = 0.2) +
+  geom_text(aes(label = if_else(is.na(rate), "", percent(rate, accuracy = 1))),
+            size = 2.4, vjust = 1) +
+  facet_wrap(~ category, ncol = 1) +
+  scale_fill_gradient(low = "#f7f7f7", high = "#08519c",
+                      na.value = "grey92",
+                      labels = percent_format(1), name = "Rate") +
+  scale_x_discrete(position = "top") +
+  labs(x = NULL, y = NULL,
+       title = "L2 feature rates: model × harm category (part 1 of 2)",
+       subtitle = paste0("Cells with n < ", MIN_CELL_N,
+                         " NC responses are masked. Ordered by category refusal rate.")) +
+  theme_minimal(base_size = 9) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 0, vjust = -0.2),
+        strip.text = element_text(face = "bold"),
+        panel.spacing.y = unit(1.2, "lines"))
+```
+
+```{r l2-mod-cat-plot-2, fig.height = 18, fig.width = 11}
+ggplot(filter(l2_mod_cat, category %in% cat_part2),
+       aes(feature, model, fill = rate)) +
+  geom_tile(colour = "white", linewidth = 0.2) +
+  geom_text(aes(label = if_else(is.na(rate), "", percent(rate, accuracy = 1))),
+            size = 2.4, vjust = 1) +
+  facet_wrap(~ category, ncol = 1) +
+  scale_fill_gradient(low = "#f7f7f7", high = "#08519c",
+                      na.value = "grey92",
+                      labels = percent_format(1), name = "Rate") +
+  scale_x_discrete(position = "top") +
+  labs(x = NULL, y = NULL,
+       title = "L2 feature rates: model × harm category (part 2 of 2)",
+       subtitle = paste0("Cells with n < ", MIN_CELL_N,
+                         " NC responses are masked.")) +
+  theme_minimal(base_size = 9) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 0, vjust = -0.2),
+        strip.text = element_text(face = "bold"),
+        panel.spacing.y = unit(1.2, "lines"))
 ```
 
 ---
@@ -463,7 +541,7 @@ df_nc |>
   mutate(feature = factor(feature, levels = L2_FEATURES)) |>
   ggplot(aes(feature, family, fill = rate)) +
     geom_tile(colour = "white", linewidth = 0.4) +
-    geom_text(aes(label = percent(rate, accuracy = 1)), size = 3) +
+    geom_text(aes(label = percent(rate, accuracy = 1)), size = 3, vjust = 1) +
     scale_fill_gradient(low = "#f7f7f7", high = "#08519c", labels = percent_format(1)) +
     labs(x = NULL, y = NULL, fill = "Rate",
          title = "L2 feature rates by provider family") +
@@ -471,7 +549,129 @@ df_nc |>
     theme(axis.text.x = element_text(angle = 30, hjust = 1))
 ```
 
-## 6.3 Selected hypothesis-shaped views
+## 6.3 Flagship-model comparison
+
+A four-way comparison of each provider's flagship: OpenAI (`gpt-5.3`),
+Anthropic (`claude-opus-4.6`), Google (`gemini-2.5-pro`), xAI (`grok-4.20`).
+Swap the `flagships` vector to use the reasoning variants or older releases.
+
+```{r flagship-setup}
+flagships <- c(
+  "OpenAI"    = "gpt-5.3",
+  "Anthropic" = "claude-opus-4.6",
+  "Google"    = "gemini-2.5-pro",
+  "xAI"       = "grok-4.20"
+)
+
+flag_pal <- c(
+  "gpt-5.3"           = "#10a37f",
+  "claude-opus-4.6"   = "#d97757",
+  "gemini-2.5-pro"    = "#4285f4",
+  "grok-4.20"         = "#1d1d1f"
+)
+
+df_flag    <- df_clean |> filter(model %in% flagships)
+df_flag_nc <- df_flag  |> filter(layer0 == "Non-compliance")
+```
+
+### Layer 0
+
+```{r flagship-l0, fig.height = 4}
+df_flag |>
+  count(model, layer0) |>
+  group_by(model) |>
+  mutate(prop = n / sum(n),
+         layer0 = factor(layer0, levels = l0_levels),
+         model  = factor(model, levels = unname(flagships))) |>
+  ggplot(aes(model, prop, fill = layer0)) +
+    geom_col(width = 0.7) +
+    scale_y_continuous(labels = percent_format(1)) +
+    scale_fill_manual(values = l0_pal) +
+    labs(x = NULL, y = NULL, fill = "Layer 0",
+         title = "Flagship comparison: Layer 0 outcome") +
+    theme_minimal(base_size = 12)
+```
+
+### Overall L2 distribution
+
+```{r flagship-l2, fig.height = 5}
+df_flag_nc |>
+  select(model, all_of(L2_FEATURES)) |>
+  pivot_longer(-model, names_to = "feature", values_to = "value") |>
+  filter(!is.na(value)) |>
+  group_by(model, feature) |>
+  summarise(rate = mean(value), .groups = "drop") |>
+  mutate(feature = factor(feature, levels = L2_FEATURES),
+         model   = factor(model, levels = unname(flagships))) |>
+  ggplot(aes(feature, rate, fill = model)) +
+    geom_col(position = position_dodge(width = 0.9), width = 0.85) +
+    scale_y_continuous(labels = percent_format(1), expand = expansion(mult = c(0, 0.05))) +
+    scale_fill_manual(values = flag_pal) +
+    labs(x = NULL, y = "rate (within NC)", fill = NULL,
+         title = "Flagship comparison: L2 feature rates (within Non-compliance)",
+         subtitle = "Higher bars indicate a feature appears more often in this model's refusals") +
+    theme_minimal(base_size = 11) +
+    theme(axis.text.x = element_text(angle = 30, hjust = 0, vjust = -0.2),
+          legend.position = "bottom")
+```
+
+### Double-click: L2 by harm category, flagship models only
+
+Heatmap of L2 feature rates faceted by harm category, restricted to the four
+flagships. Same `MIN_CELL_N` mask as §5.5 to suppress unreliable rates.
+
+```{r flagship-l2-by-cat, fig.height = 16, fig.width = 10}
+flag_l2_cat <- df_flag_nc |>
+  select(model, category = primary_llama_guard_category_name,
+         all_of(L2_FEATURES)) |>
+  pivot_longer(-c(model, category), names_to = "feature", values_to = "value") |>
+  filter(!is.na(value)) |>
+  group_by(model, category, feature) |>
+  summarise(rate = mean(value), n = n(), .groups = "drop") |>
+  mutate(rate = if_else(n < MIN_CELL_N, NA_real_, rate),
+         feature = factor(feature, levels = L2_FEATURES),
+         model   = factor(model, levels = unname(flagships)),
+         category = factor(category, levels = cat_order))
+
+ggplot(flag_l2_cat, aes(feature, model, fill = rate)) +
+  geom_tile(colour = "white", linewidth = 0.3) +
+  geom_text(aes(label = if_else(is.na(rate), "", percent(rate, accuracy = 1))),
+            size = 2.6, vjust = 1) +
+  facet_wrap(~ category, ncol = 2) +
+  scale_fill_gradient(low = "#f7f7f7", high = "#08519c",
+                      na.value = "grey92",
+                      labels = percent_format(1), name = "Rate") +
+  scale_x_discrete(position = "top") +
+  labs(x = NULL, y = NULL,
+       title = "Flagship × L2 feature × harm category",
+       subtitle = paste0("Rate within each (model, category) NC set. Cells with n < ",
+                         MIN_CELL_N, " masked.")) +
+  theme_minimal(base_size = 9) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 0, vjust = -0.2),
+        strip.text = element_text(face = "bold"))
+```
+
+### Mitigation profile, side-by-side
+
+```{r flagship-affiliative, fig.height = 4}
+df_flag_nc |>
+  mutate(model = factor(model, levels = unname(flagships))) |>
+  select(model, apology, hedge, positive_alignment, solidarity) |>
+  pivot_longer(-model, names_to = "feature", values_to = "value") |>
+  filter(!is.na(value)) |>
+  group_by(model, feature) |>
+  summarise(rate = mean(value), .groups = "drop") |>
+  ggplot(aes(feature, rate, fill = model)) +
+    geom_col(position = position_dodge(width = 0.9), width = 0.85) +
+    scale_y_continuous(labels = percent_format(1), expand = expansion(mult = c(0, 0.05))) +
+    scale_fill_manual(values = flag_pal) +
+    labs(x = NULL, y = NULL, fill = NULL,
+         title = "Flagship affiliative / mitigating features") +
+    theme_minimal(base_size = 11) +
+    theme(legend.position = "bottom")
+```
+
+## 6.4 Selected hypothesis-shaped views
 
 > *Pre-registered framing direction (paper draft): modern safety training appears
 > to shift LLM refusals toward firmer boundaries and away from human-like
@@ -494,7 +694,7 @@ df_nc |>
          title = "Apology in non-compliance: OpenAI vs Anthropic",
          subtitle = "Earlier models lean on apology; newer ones do not") +
     theme_minimal(base_size = 11) +
-    theme(axis.text.x = element_text(angle = 30, hjust = 1),
+    theme(axis.text.x = element_text(angle = 30, vjust=0.5, hjust=0.5),
           legend.position = "bottom")
 ```
 
@@ -512,7 +712,7 @@ df_nc |>
     labs(x = NULL, y = "negative_stance rate",
          title = "Negative stance prevalence by model") +
     theme_minimal(base_size = 11) +
-    theme(axis.text.x = element_text(angle = 30, hjust = 1),
+    theme(axis.text.x = element_text(angle = 30, vjust=0.5, hjust=0.5),
           legend.position = "bottom")
 ```
 
@@ -553,16 +753,82 @@ set.seed(20260519)
 MAX_QUERY_CHARS    <- 400
 MAX_RESPONSE_CHARS <- 900
 SAMPLES_PER_CELL   <- 1   # per (model × L0). Bump to 2-3 once layout is reviewed.
+
+# HTML-escape user-facing text. Also substitutes entities for the two
+# characters that can launch block-level markdown constructs (#, `), as a
+# defence in depth in case pandoc's markdown_in_html_blocks extension
+# parses content inside our table cells.
+html_escape <- function(x) {
+  x <- as.character(x)
+  x <- gsub("&", "&amp;", x, fixed = TRUE)
+  x <- gsub("<", "&lt;",  x, fixed = TRUE)
+  x <- gsub(">", "&gt;",  x, fixed = TRUE)
+  x <- gsub("#", "&#35;", x, fixed = TRUE)
+  x <- gsub("`", "&#96;", x, fixed = TRUE)
+  x
+}
+truncate_text <- function(x, max_chars) {
+  x <- as.character(x)
+  ifelse(nchar(x) > max_chars,
+         paste0(substr(x, 1, max_chars - 3), "..."),
+         x)
+}
+
+# Render a tibble of flavour rows as a raw HTML table. Pandoc preserves
+# <table> blocks verbatim with the raw_html extension, and content inside
+# <pre>...</pre> is not parsed as markdown — together this avoids kable's
+# pipe-format / escape-on-render quirks that were leaking model markdown
+# into the document's ToC.
+render_flavour_table <- function(df, text_cols = c("query", "response"),
+                                 col_widths = list(query = "22em",
+                                                   response = "32em")) {
+  meta_cols <- setdiff(names(df), text_cols)
+
+  css <- '<style>
+    table.flavour { border-collapse: collapse; width: 100%; font-size: 11px;
+                    font-family: ui-sans-serif, system-ui, sans-serif; }
+    table.flavour th, table.flavour td { border: 1px solid #ddd; padding: 6px;
+                                         vertical-align: top; }
+    table.flavour th { background: #f4f4f4; font-weight: 600; text-align: left; }
+    table.flavour tr:nth-child(even) td { background: #fafafa; }
+    table.flavour pre { white-space: pre-wrap; margin: 0;
+                        font-family: ui-monospace, monospace; font-size: 11px;
+                        max-height: 18em; overflow-y: auto;
+                        background: transparent; border: none; padding: 0; }
+  </style>'
+
+  thead <- paste0("<tr>",
+                  paste0("<th>", html_escape(names(df)), "</th>", collapse = ""),
+                  "</tr>")
+
+  body_rows <- vapply(seq_len(nrow(df)), function(i) {
+    cells <- vapply(names(df), function(col) {
+      val <- df[[col]][[i]]
+      if (col %in% text_cols) {
+        width <- col_widths[[col]] %||% "20em"
+        paste0('<td style="max-width:', width, ';"><pre>',
+               html_escape(truncate_text(val,
+                                         if (col == "response") MAX_RESPONSE_CHARS
+                                         else MAX_QUERY_CHARS)),
+               "</pre></td>")
+      } else {
+        paste0("<td>", html_escape(val), "</td>")
+      }
+    }, character(1))
+    paste0("<tr>", paste0(cells, collapse = ""), "</tr>")
+  }, character(1))
+
+  paste0(css, '<table class="flavour"><thead>', thead,
+         "</thead><tbody>", paste0(body_rows, collapse = ""),
+         "</tbody></table>")
+}
+
+`%||%` <- function(a, b) if (is.null(a)) b else a
 ```
 
 ## 7.1 One example per (model × L0)
 
-```{r flavour-by-model}
-truncate_text <- function(x, n) {
-  x <- as.character(x)
-  ifelse(nchar(x) > n, paste0(substr(x, 1, n - 3), "..."), x)
-}
-
+```{r flavour-by-model, results = 'asis'}
 flavour <- df_clean |>
   filter(!is.na(query), !is.na(response), nchar(response) > 0) |>
   group_by(model, layer0) |>
@@ -570,10 +836,8 @@ flavour <- df_clean |>
   ungroup() |>
   arrange(model, factor(layer0, levels = l0_levels)) |>
   mutate(
-    query    = truncate_text(query,    MAX_QUERY_CHARS),
-    response = truncate_text(response, MAX_RESPONSE_CHARS),
     L2 = pmap_chr(
-      select(., all_of(L2_FEATURES)),
+      pick(all_of(L2_FEATURES)),
       function(...) {
         vals <- list(...)
         names(vals) <- L2_FEATURES
@@ -582,13 +846,12 @@ flavour <- df_clean |>
       }
     )
   ) |>
-  select(model, layer0, layer1, L2, category = primary_llama_guard_category_name, query, response)
+  select(model, layer0, layer1, L2,
+         category = primary_llama_guard_category_name,
+         query, response)
 
-flavour |>
-  kable(caption = "One sampled response per (model × Layer 0 outcome).") |>
-  kable_styling(bootstrap_options = c("striped", "hover"), font_size = 10) |>
-  column_spec(6, width = "20em") |>
-  column_spec(7, width = "30em")
+cat("<p><i>One sampled response per (model × Layer 0 outcome).</i></p>\n")
+cat(render_flavour_table(flavour))
 ```
 
 ## 7.2 One example per (harm category × representative model)
@@ -597,34 +860,29 @@ To get a flavour across the request spectrum: for each harm category, sample
 one response from `gpt-4o`, `claude-sonnet-4.6`, `gemini-2.5-pro`, and
 `llama-3.1-70b` (a spread of provider safety stances).
 
-```{r flavour-by-category}
+```{r flavour-by-category, results = 'asis'}
 focal_models <- c("gpt-4o", "claude-sonnet-4.6", "gemini-2.5-pro", "llama-3.1-70b")
 
-df_clean |>
+flavour_by_cat <- df_clean |>
   filter(model %in% focal_models,
          !is.na(query), !is.na(response), nchar(response) > 0) |>
   group_by(primary_llama_guard_category_name, model) |>
   slice_sample(n = 1) |>
   ungroup() |>
-  arrange(primary_llama_guard_category_name, factor(model, levels = focal_models)) |>
-  mutate(
-    query    = truncate_text(query, MAX_QUERY_CHARS),
-    response = truncate_text(response, MAX_RESPONSE_CHARS)
-  ) |>
-  select(category = primary_llama_guard_category_name, model, layer0, layer1,
-         query, response) |>
-  kable(caption = "One sampled response per harm category × focal model.") |>
-  kable_styling(bootstrap_options = c("striped", "hover"), font_size = 10) |>
-  column_spec(5, width = "20em") |>
-  column_spec(6, width = "30em")
+  arrange(primary_llama_guard_category_name,
+          factor(model, levels = focal_models)) |>
+  select(category = primary_llama_guard_category_name,
+         model, layer0, layer1, query, response)
+
+cat("<p><i>One sampled response per harm category × focal model.</i></p>\n")
+cat(render_flavour_table(flavour_by_cat))
 ```
 
 ---
 
 # 8. Statistical hypothesis tests (scaffolding)
 
-> EMNLP papers usually carry their argument with descriptive plots and a small
-> number of well-chosen tests rather than a full stats appendix. The blocks
+>  The blocks
 > below give a working starting point — chi-square omnibus tests, McNemar for
 > the paired reasoning comparisons, a mixed-effects model that respects the
 > nested structure (prompts × models), and a composite "human-like mitigation"

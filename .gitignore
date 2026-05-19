@@ -28,3 +28,5 @@ Thumbs.db
 # API keys
 *.key
 *.secret
+
+claude.md
