@@ -2,71 +2,31 @@
 """Run the calibrated LLM judge on unlabeled validation response records."""
 
 import argparse
-import csv
-import json
 import time
 from pathlib import Path
+from typing import Dict, List, Optional
 
 import httpx
-from openai import OpenAI
 from tqdm import tqdm
 
-from ft_judge_common import DATA_DIR, SYSTEM_PROMPT, gold_annotation, load_gold, user_message
-from run_calibrated_judge import (
-    build_calibration_section,
+from gold_rule_common import build_gold_rule_section
+from judge_config import DATA_DIR, DEFAULT_GOLD_RULE_PATH, JUDGE_SYSTEM_PROMPT, L2_KEYS
+from judge_utils import (
     create_client,
-    parse_json_response,
-    retry_call,
-    select_calibration_items,
+    load_records,
+    record_id,
+    retry_parse_call,
+    text_sha256,
+    user_message,
+    write_csv,
+    write_json,
 )
-from run_ensemble_judge import L2_KEYS
 
 
 DEFAULT_OUTPUT = DATA_DIR / "judge_validation_200_predictions.json"
 
 
-def load_records(path: Path) -> list[dict]:
-    if path.suffix.lower() == ".csv":
-        with open(path, "r", encoding="utf-8-sig", newline="") as f:
-            return list(csv.DictReader(f))
-
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    if isinstance(data, list):
-        return data
-    raise ValueError(f"Expected a list of records in {path}")
-
-
-def write_json(path: Path, records: list[dict]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(records, f, indent=2, ensure_ascii=False)
-
-
-def write_csv(path: Path, records: list[dict]) -> None:
-    if not records:
-        return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fieldnames = []
-    for record in records:
-        for key in record:
-            if key not in fieldnames:
-                fieldnames.append(key)
-    with open(path, "w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(records)
-
-
-def record_id(record: dict) -> str:
-    for key in ["human_eval_id", "final_sample_id", "sample_id", "candidate_id"]:
-        value = record.get(key)
-        if value not in (None, ""):
-            return f"{key}:{value}"
-    return f"query:{record.get('query', '')[:80]}"
-
-
-def validate_records(records: list[dict], input_path: Path) -> None:
+def validate_records(records: List[Dict], input_path: Path) -> None:
     if not records:
         raise ValueError(f"No records found in {input_path}")
     missing_query = [idx for idx, r in enumerate(records, start=1) if not r.get("query")]
@@ -74,34 +34,31 @@ def validate_records(records: list[dict], input_path: Path) -> None:
     if missing_query:
         raise ValueError(f"{input_path} is missing 'query' for rows: {missing_query[:10]}")
     if missing_response:
-        raise ValueError(
-            f"{input_path} has no 'response' column/value for {len(missing_response)} rows. "
-            "LLM-as-judge needs query-response pairs. First collect model responses with "
-            "scripts/02_collect_responses.py, then pass the response JSON/CSV here."
+        print(
+            f"WARNING: {input_path} has no response for {len(missing_response)} rows. "
+            "Those rows will be marked judge_skipped instead of sent to the judge."
         )
 
 
-def build_prompt(calibration_size: int, max_query_chars: int, max_response_chars: int) -> str:
-    gold = load_gold()
-    train_ids_path = DATA_DIR / "ft_judge_train_ids.json"
-    if not train_ids_path.exists():
-        raise FileNotFoundError(
-            f"Missing {train_ids_path}. Run scripts/prepare_ft_judge_data.py first."
+def build_prompt(
+    max_query_chars: int,
+    max_response_chars: int,
+    gold_rule_path: Optional[str],
+    gold_rule_examples: Optional[int],
+) -> str:
+    prompt = JUDGE_SYSTEM_PROMPT
+    if gold_rule_path:
+        prompt += build_gold_rule_section(
+            gold_rule_path,
+            max_examples=gold_rule_examples,
+            max_query_chars=max_query_chars,
+            max_response_chars=max_response_chars,
         )
-    with open(train_ids_path, "r", encoding="utf-8") as f:
-        train_ids = [int(value) for value in json.load(f)]
-    calibration_items = select_calibration_items(gold, train_ids, calibration_size)
-    calibration_section = build_calibration_section(
-        calibration_items,
-        max_query_chars=max_query_chars,
-        max_response_chars=max_response_chars,
-    )
-    print(f"Calibration examples: {[item['human_eval_id'] for item in calibration_items]}")
-    return SYSTEM_PROMPT + calibration_section
+    return prompt
 
 
 def judge_record(
-    client: OpenAI,
+    client,
     provider: str,
     model: str,
     prompt: str,
@@ -133,7 +90,7 @@ def judge_record(
         )
         return response.output_text.strip()
 
-    return parse_json_response(retry_call(call))
+    return retry_parse_call(call)
 
 
 def prediction_fields(result: dict) -> dict:
@@ -148,12 +105,19 @@ def main() -> None:
     parser.add_argument("--provider", choices=["openai", "openrouter"], default="openrouter")
     parser.add_argument("--model", default="openai/gpt-5.3-chat")
     parser.add_argument("--reasoning-effort", default="high", choices=["none", "low", "medium", "high"])
-    parser.add_argument("--calibration-size", type=int, default=20)
+    parser.add_argument("--calibration-size", type=int, default=0,
+                        help="Deprecated compatibility flag. Training-split calibration is no longer used.")
+    parser.add_argument("--gold-rule-path", default=str(DEFAULT_GOLD_RULE_PATH),
+                        help="Path to human Gold Rule xlsx. Pass an empty string to disable.")
+    parser.add_argument("--gold-rule-examples", type=int, default=25,
+                        help="Number of Gold Rule examples to include. Default uses the current 25.")
     parser.add_argument("--max-query-chars", type=int, default=900)
     parser.add_argument("--max-response-chars", type=int, default=1800)
     parser.add_argument("--delay", type=float, default=0.3)
     parser.add_argument("--limit", type=int, default=None)
     args = parser.parse_args()
+    if args.calibration_size:
+        print("NOTE: --calibration-size is deprecated and ignored. The prompt uses system rules + Gold Rule examples only.")
 
     input_path = Path(args.input)
     records = load_records(input_path)
@@ -163,19 +127,50 @@ def main() -> None:
 
     output_path = Path(args.output)
     existing = load_records(output_path) if output_path.exists() else []
-    done_ids = {record_id(record) for record in existing if not record.get("parse_error")}
-    results = list(existing)
-
-    prompt = build_prompt(args.calibration_size, args.max_query_chars, args.max_response_chars)
+    prompt = build_prompt(
+        args.max_query_chars,
+        args.max_response_chars,
+        args.gold_rule_path or None,
+        args.gold_rule_examples,
+    )
     prompt_path = output_path.with_suffix(".prompt.txt")
+    prompt_path.parent.mkdir(parents=True, exist_ok=True)
     prompt_path.write_text(prompt, encoding="utf-8")
+    prompt_hash = text_sha256(prompt)
     print(f"Saved prompt -> {prompt_path}")
+    print(f"Judge prompt SHA256: {prompt_hash}")
+
+    successful = [record for record in existing if not record.get("parse_error")]
+    results = [record for record in successful if record.get("judge_prompt_sha256") == prompt_hash]
+    skipped_errors = len(existing) - len(successful)
+    stale_successes = len(successful) - len(results)
+    if skipped_errors:
+        print(f"Retrying {skipped_errors} previous parse/API errors instead of keeping them in output.")
+    if stale_successes:
+        print(f"Rerunning {stale_successes} previous successes because the prompt hash changed.")
+    done_ids = {record_id(record) for record in results}
 
     client = create_client(args.provider, httpx.Timeout(180.0, connect=30.0))
 
     for record in tqdm(records, desc=f"[{args.provider}:{args.model} validation judge]"):
         rid = record_id(record)
         if rid in done_ids:
+            continue
+        if not record.get("response"):
+            result = {
+                **record,
+                "judge_provider": args.provider,
+                "judge_model": args.model,
+                "judge_reasoning_effort": args.reasoning_effort,
+                "judge_prompt_sha256": prompt_hash,
+                "parse_error": False,
+                "judge_skipped": True,
+                "skip_reason": "missing response",
+            }
+            results.append(result)
+            done_ids.add(rid)
+            write_json(output_path, results)
+            write_csv(output_path.with_suffix(".csv"), results)
             continue
         try:
             judgment = judge_record(
@@ -192,6 +187,7 @@ def main() -> None:
                 "judge_provider": args.provider,
                 "judge_model": args.model,
                 "judge_reasoning_effort": args.reasoning_effort,
+                "judge_prompt_sha256": prompt_hash,
                 "parse_error": False,
             }
         except Exception as exc:
@@ -200,6 +196,7 @@ def main() -> None:
                 "judge_provider": args.provider,
                 "judge_model": args.model,
                 "judge_reasoning_effort": args.reasoning_effort,
+                "judge_prompt_sha256": prompt_hash,
                 "parse_error": True,
                 "raw_output": str(exc),
             }
