@@ -1,0 +1,65 @@
+model,layer1,count,rate_among_non_compliance
+Claude Opus 4.6 + reasoning,Bare,3,0.01818181818181818
+Claude Opus 4.6 + reasoning,Capacity-based,1,0.006060606060606061
+Claude Opus 4.6 + reasoning,Policy-based,14,0.08484848484848485
+Claude Opus 4.6 + reasoning,Ethics-based,147,0.8909090909090909
+Claude Opus 4.6,Bare,5,0.029940119760479042
+Claude Opus 4.6,Capacity-based,2,0.011976047904191617
+Claude Opus 4.6,Policy-based,10,0.059880239520958084
+Claude Opus 4.6,Ethics-based,150,0.8982035928143712
+Claude Sonnet 3.7,Bare,2,0.011764705882352941
+Claude Sonnet 3.7,Capacity-based,4,0.023529411764705882
+Claude Sonnet 3.7,Policy-based,15,0.08823529411764706
+Claude Sonnet 3.7,Ethics-based,149,0.8764705882352941
+Claude Sonnet 4.6,Bare,6,0.0379746835443038
+Claude Sonnet 4.6,Capacity-based,0,0.0
+Claude Sonnet 4.6,Policy-based,7,0.04430379746835443
+Claude Sonnet 4.6,Ethics-based,145,0.9177215189873418
+Gemini 2.5 Pro,Bare,0,0.0
+Gemini 2.5 Pro,Capacity-based,0,0.0
+Gemini 2.5 Pro,Policy-based,17,0.1504424778761062
+Gemini 2.5 Pro,Ethics-based,96,0.8495575221238938
+GPT-4o,Bare,134,0.8535031847133758
+GPT-4o,Capacity-based,0,0.0
+GPT-4o,Policy-based,2,0.012738853503184714
+GPT-4o,Ethics-based,21,0.1337579617834395
+GPT-5.3 + reasoning,Bare,14,0.07909604519774012
+GPT-5.3 + reasoning,Capacity-based,0,0.0
+GPT-5.3 + reasoning,Policy-based,21,0.11864406779661017
+GPT-5.3 + reasoning,Ethics-based,142,0.8022598870056498
+GPT 5.3,Bare,6,0.03488372093023256
+GPT 5.3,Capacity-based,0,0.0
+GPT 5.3,Policy-based,21,0.12209302325581395
+GPT 5.3,Ethics-based,145,0.8430232558139535
+GPT-5,Bare,29,0.1638418079096045
+GPT-5,Capacity-based,0,0.0
+GPT-5,Policy-based,14,0.07909604519774012
+GPT-5,Ethics-based,134,0.7570621468926554
+Grok 4.20,Bare,9,0.06428571428571428
+Grok 4.20,Capacity-based,0,0.0
+Grok 4.20,Policy-based,22,0.15714285714285714
+Grok 4.20,Ethics-based,109,0.7785714285714286
+Llama 3.1 70B,Bare,90,0.5882352941176471
+Llama 3.1 70B,Capacity-based,3,0.0196078431372549
+Llama 3.1 70B,Policy-based,29,0.1895424836601307
+Llama 3.1 70B,Ethics-based,31,0.20261437908496732
+Llama 3.1 8B,Bare,129,0.7049180327868853
+Llama 3.1 8B,Capacity-based,1,0.00546448087431694
+Llama 3.1 8B,Policy-based,8,0.04371584699453552
+Llama 3.1 8B,Ethics-based,45,0.2459016393442623
+Qwen3-32B + reasoning,Bare,5,0.04065040650406504
+Qwen3-32B + reasoning,Capacity-based,0,0.0
+Qwen3-32B + reasoning,Policy-based,11,0.08943089430894309
+Qwen3-32B + reasoning,Ethics-based,107,0.8699186991869918
+Qwen3-32B,Bare,19,0.15079365079365079
+Qwen3-32B,Capacity-based,0,0.0
+Qwen3-32B,Policy-based,9,0.07142857142857142
+Qwen3-32B,Ethics-based,98,0.7777777777777778
+Qwen3-8B + reasoning,Bare,5,0.03787878787878788
+Qwen3-8B + reasoning,Capacity-based,0,0.0
+Qwen3-8B + reasoning,Policy-based,10,0.07575757575757576
+Qwen3-8B + reasoning,Ethics-based,117,0.8863636363636364
+Qwen3-8B,Bare,3,0.022727272727272728
+Qwen3-8B,Capacity-based,0,0.0
+Qwen3-8B,Policy-based,13,0.09848484848484848
+Qwen3-8B,Ethics-based,116,0.8787878787878788

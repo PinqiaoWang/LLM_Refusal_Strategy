@@ -1,0 +1,209 @@
+model,feature,count,n_non_compliance,rate_among_non_compliance
+Claude Opus 4.6 + reasoning,explicit_nc,164,165,0.9939393939393939
+Claude Opus 4.6 + reasoning,implicit_nc,1,165,0.006060606060606061
+Claude Opus 4.6 + reasoning,apology,0,165,0.0
+Claude Opus 4.6 + reasoning,hedge,0,165,0.0
+Claude Opus 4.6 + reasoning,explanatory_preface,0,165,0.0
+Claude Opus 4.6 + reasoning,positive_alignment,4,165,0.024242424242424242
+Claude Opus 4.6 + reasoning,solidarity,14,165,0.08484848484848485
+Claude Opus 4.6 + reasoning,negative_stance,145,165,0.8787878787878788
+Claude Opus 4.6 + reasoning,executed_alternative,67,165,0.40606060606060607
+Claude Opus 4.6 + reasoning,alternative_offer,98,165,0.593939393939394
+Claude Opus 4.6 + reasoning,normative_suggestion,32,165,0.19393939393939394
+Claude Opus 4.6 + reasoning,statement_of_principle,4,165,0.024242424242424242
+Claude Opus 4.6 + reasoning,role_based,0,165,0.0
+Claude Opus 4.6,explicit_nc,166,167,0.9940119760479041
+Claude Opus 4.6,implicit_nc,1,167,0.005988023952095809
+Claude Opus 4.6,apology,2,167,0.011976047904191617
+Claude Opus 4.6,hedge,0,167,0.0
+Claude Opus 4.6,explanatory_preface,1,167,0.005988023952095809
+Claude Opus 4.6,positive_alignment,5,167,0.029940119760479042
+Claude Opus 4.6,solidarity,12,167,0.0718562874251497
+Claude Opus 4.6,negative_stance,145,167,0.8682634730538922
+Claude Opus 4.6,executed_alternative,62,167,0.3712574850299401
+Claude Opus 4.6,alternative_offer,104,167,0.6227544910179641
+Claude Opus 4.6,normative_suggestion,26,167,0.15568862275449102
+Claude Opus 4.6,statement_of_principle,5,167,0.029940119760479042
+Claude Opus 4.6,role_based,0,167,0.0
+Claude Sonnet 3.7,explicit_nc,137,170,0.8058823529411765
+Claude Sonnet 3.7,implicit_nc,33,170,0.19411764705882353
+Claude Sonnet 3.7,apology,68,170,0.4
+Claude Sonnet 3.7,hedge,1,170,0.0058823529411764705
+Claude Sonnet 3.7,explanatory_preface,34,170,0.2
+Claude Sonnet 3.7,positive_alignment,48,170,0.2823529411764706
+Claude Sonnet 3.7,solidarity,8,170,0.047058823529411764
+Claude Sonnet 3.7,negative_stance,149,170,0.8764705882352941
+Claude Sonnet 3.7,executed_alternative,65,170,0.38235294117647056
+Claude Sonnet 3.7,alternative_offer,120,170,0.7058823529411765
+Claude Sonnet 3.7,normative_suggestion,49,170,0.28823529411764703
+Claude Sonnet 3.7,statement_of_principle,11,170,0.06470588235294118
+Claude Sonnet 3.7,role_based,3,170,0.01764705882352941
+Claude Sonnet 4.6,explicit_nc,150,158,0.9493670886075949
+Claude Sonnet 4.6,implicit_nc,8,158,0.05063291139240506
+Claude Sonnet 4.6,apology,0,158,0.0
+Claude Sonnet 4.6,hedge,0,158,0.0
+Claude Sonnet 4.6,explanatory_preface,18,158,0.11392405063291139
+Claude Sonnet 4.6,positive_alignment,11,158,0.06962025316455696
+Claude Sonnet 4.6,solidarity,7,158,0.04430379746835443
+Claude Sonnet 4.6,negative_stance,139,158,0.879746835443038
+Claude Sonnet 4.6,executed_alternative,50,158,0.31645569620253167
+Claude Sonnet 4.6,alternative_offer,85,158,0.5379746835443038
+Claude Sonnet 4.6,normative_suggestion,24,158,0.1518987341772152
+Claude Sonnet 4.6,statement_of_principle,1,158,0.006329113924050633
+Claude Sonnet 4.6,role_based,0,158,0.0
+Gemini 2.5 Pro,explicit_nc,108,113,0.9557522123893806
+Gemini 2.5 Pro,implicit_nc,5,113,0.04424778761061947
+Gemini 2.5 Pro,apology,4,113,0.035398230088495575
+Gemini 2.5 Pro,hedge,0,113,0.0
+Gemini 2.5 Pro,explanatory_preface,14,113,0.12389380530973451
+Gemini 2.5 Pro,positive_alignment,10,113,0.08849557522123894
+Gemini 2.5 Pro,solidarity,25,113,0.22123893805309736
+Gemini 2.5 Pro,negative_stance,102,113,0.9026548672566371
+Gemini 2.5 Pro,executed_alternative,81,113,0.7168141592920354
+Gemini 2.5 Pro,alternative_offer,11,113,0.09734513274336283
+Gemini 2.5 Pro,normative_suggestion,39,113,0.34513274336283184
+Gemini 2.5 Pro,statement_of_principle,23,113,0.20353982300884957
+Gemini 2.5 Pro,role_based,21,113,0.18584070796460178
+GPT-4o,explicit_nc,141,157,0.8980891719745223
+GPT-4o,implicit_nc,16,157,0.10191082802547771
+GPT-4o,apology,147,157,0.9363057324840764
+GPT-4o,hedge,0,157,0.0
+GPT-4o,explanatory_preface,1,157,0.006369426751592357
+GPT-4o,positive_alignment,2,157,0.012738853503184714
+GPT-4o,solidarity,8,157,0.050955414012738856
+GPT-4o,negative_stance,7,157,0.044585987261146494
+GPT-4o,executed_alternative,14,157,0.08917197452229299
+GPT-4o,alternative_offer,6,157,0.03821656050955414
+GPT-4o,normative_suggestion,4,157,0.025477707006369428
+GPT-4o,statement_of_principle,0,157,0.0
+GPT-4o,role_based,0,157,0.0
+GPT-5.3 + reasoning,explicit_nc,174,177,0.9830508474576272
+GPT-5.3 + reasoning,implicit_nc,3,177,0.01694915254237288
+GPT-5.3 + reasoning,apology,6,177,0.03389830508474576
+GPT-5.3 + reasoning,hedge,0,177,0.0
+GPT-5.3 + reasoning,explanatory_preface,2,177,0.011299435028248588
+GPT-5.3 + reasoning,positive_alignment,4,177,0.022598870056497175
+GPT-5.3 + reasoning,solidarity,9,177,0.05084745762711865
+GPT-5.3 + reasoning,negative_stance,123,177,0.6949152542372882
+GPT-5.3 + reasoning,executed_alternative,69,177,0.3898305084745763
+GPT-5.3 + reasoning,alternative_offer,129,177,0.7288135593220338
+GPT-5.3 + reasoning,normative_suggestion,46,177,0.2598870056497175
+GPT-5.3 + reasoning,statement_of_principle,0,177,0.0
+GPT-5.3 + reasoning,role_based,0,177,0.0
+GPT 5.3,explicit_nc,168,172,0.9767441860465116
+GPT 5.3,implicit_nc,4,172,0.023255813953488372
+GPT 5.3,apology,7,172,0.040697674418604654
+GPT 5.3,hedge,0,172,0.0
+GPT 5.3,explanatory_preface,1,172,0.005813953488372093
+GPT 5.3,positive_alignment,2,172,0.011627906976744186
+GPT 5.3,solidarity,6,172,0.03488372093023256
+GPT 5.3,negative_stance,126,172,0.7325581395348837
+GPT 5.3,executed_alternative,66,172,0.38372093023255816
+GPT 5.3,alternative_offer,130,172,0.7558139534883721
+GPT 5.3,normative_suggestion,44,172,0.2558139534883721
+GPT 5.3,statement_of_principle,0,172,0.0
+GPT 5.3,role_based,0,172,0.0
+GPT-5,explicit_nc,171,177,0.9661016949152542
+GPT-5,implicit_nc,6,177,0.03389830508474576
+GPT-5,apology,70,177,0.3954802259887006
+GPT-5,hedge,0,177,0.0
+GPT-5,explanatory_preface,3,177,0.01694915254237288
+GPT-5,positive_alignment,2,177,0.011299435028248588
+GPT-5,solidarity,15,177,0.0847457627118644
+GPT-5,negative_stance,115,177,0.6497175141242938
+GPT-5,executed_alternative,118,177,0.6666666666666666
+GPT-5,alternative_offer,68,177,0.384180790960452
+GPT-5,normative_suggestion,41,177,0.23163841807909605
+GPT-5,statement_of_principle,3,177,0.01694915254237288
+GPT-5,role_based,0,177,0.0
+Grok 4.20,explicit_nc,133,140,0.95
+Grok 4.20,implicit_nc,7,140,0.05
+Grok 4.20,apology,35,140,0.25
+Grok 4.20,hedge,0,140,0.0
+Grok 4.20,explanatory_preface,0,140,0.0
+Grok 4.20,positive_alignment,0,140,0.0
+Grok 4.20,solidarity,7,140,0.05
+Grok 4.20,negative_stance,114,140,0.8142857142857143
+Grok 4.20,executed_alternative,39,140,0.2785714285714286
+Grok 4.20,alternative_offer,72,140,0.5142857142857142
+Grok 4.20,normative_suggestion,32,140,0.22857142857142856
+Grok 4.20,statement_of_principle,4,140,0.02857142857142857
+Grok 4.20,role_based,6,140,0.04285714285714286
+Llama 3.1 70B,explicit_nc,144,153,0.9411764705882353
+Llama 3.1 70B,implicit_nc,9,153,0.058823529411764705
+Llama 3.1 70B,apology,0,153,0.0
+Llama 3.1 70B,hedge,0,153,0.0
+Llama 3.1 70B,explanatory_preface,5,153,0.032679738562091505
+Llama 3.1 70B,positive_alignment,10,153,0.06535947712418301
+Llama 3.1 70B,solidarity,3,153,0.0196078431372549
+Llama 3.1 70B,negative_stance,20,153,0.13071895424836602
+Llama 3.1 70B,executed_alternative,10,153,0.06535947712418301
+Llama 3.1 70B,alternative_offer,57,153,0.37254901960784315
+Llama 3.1 70B,normative_suggestion,3,153,0.0196078431372549
+Llama 3.1 70B,statement_of_principle,0,153,0.0
+Llama 3.1 70B,role_based,0,153,0.0
+Llama 3.1 8B,explicit_nc,181,183,0.9890710382513661
+Llama 3.1 8B,implicit_nc,2,183,0.01092896174863388
+Llama 3.1 8B,apology,0,183,0.0
+Llama 3.1 8B,hedge,0,183,0.0
+Llama 3.1 8B,explanatory_preface,0,183,0.0
+Llama 3.1 8B,positive_alignment,0,183,0.0
+Llama 3.1 8B,solidarity,7,183,0.03825136612021858
+Llama 3.1 8B,negative_stance,29,183,0.15846994535519127
+Llama 3.1 8B,executed_alternative,11,183,0.060109289617486336
+Llama 3.1 8B,alternative_offer,62,183,0.33879781420765026
+Llama 3.1 8B,normative_suggestion,0,183,0.0
+Llama 3.1 8B,statement_of_principle,0,183,0.0
+Llama 3.1 8B,role_based,0,183,0.0
+Qwen3-32B + reasoning,explicit_nc,92,123,0.7479674796747967
+Qwen3-32B + reasoning,implicit_nc,31,123,0.25203252032520324
+Qwen3-32B + reasoning,apology,77,123,0.6260162601626016
+Qwen3-32B + reasoning,hedge,0,123,0.0
+Qwen3-32B + reasoning,explanatory_preface,1,123,0.008130081300813009
+Qwen3-32B + reasoning,positive_alignment,2,123,0.016260162601626018
+Qwen3-32B + reasoning,solidarity,8,123,0.06504065040650407
+Qwen3-32B + reasoning,negative_stance,103,123,0.8373983739837398
+Qwen3-32B + reasoning,executed_alternative,67,123,0.5447154471544715
+Qwen3-32B + reasoning,alternative_offer,56,123,0.45528455284552843
+Qwen3-32B + reasoning,normative_suggestion,49,123,0.3983739837398374
+Qwen3-32B + reasoning,statement_of_principle,16,123,0.13008130081300814
+Qwen3-32B + reasoning,role_based,5,123,0.04065040650406504
+Qwen3-32B,explicit_nc,100,126,0.7936507936507936
+Qwen3-32B,implicit_nc,26,126,0.20634920634920634
+Qwen3-32B,apology,79,126,0.626984126984127
+Qwen3-32B,hedge,0,126,0.0
+Qwen3-32B,explanatory_preface,4,126,0.031746031746031744
+Qwen3-32B,positive_alignment,2,126,0.015873015873015872
+Qwen3-32B,solidarity,7,126,0.05555555555555555
+Qwen3-32B,negative_stance,92,126,0.7301587301587301
+Qwen3-32B,executed_alternative,60,126,0.47619047619047616
+Qwen3-32B,alternative_offer,54,126,0.42857142857142855
+Qwen3-32B,normative_suggestion,40,126,0.31746031746031744
+Qwen3-32B,statement_of_principle,12,126,0.09523809523809523
+Qwen3-32B,role_based,8,126,0.06349206349206349
+Qwen3-8B + reasoning,explicit_nc,88,132,0.6666666666666666
+Qwen3-8B + reasoning,implicit_nc,44,132,0.3333333333333333
+Qwen3-8B + reasoning,apology,24,132,0.18181818181818182
+Qwen3-8B + reasoning,hedge,0,132,0.0
+Qwen3-8B + reasoning,explanatory_preface,2,132,0.015151515151515152
+Qwen3-8B + reasoning,positive_alignment,3,132,0.022727272727272728
+Qwen3-8B + reasoning,solidarity,12,132,0.09090909090909091
+Qwen3-8B + reasoning,negative_stance,113,132,0.8560606060606061
+Qwen3-8B + reasoning,executed_alternative,71,132,0.5378787878787878
+Qwen3-8B + reasoning,alternative_offer,62,132,0.4696969696969697
+Qwen3-8B + reasoning,normative_suggestion,60,132,0.45454545454545453
+Qwen3-8B + reasoning,statement_of_principle,11,132,0.08333333333333333
+Qwen3-8B + reasoning,role_based,9,132,0.06818181818181818
+Qwen3-8B,explicit_nc,95,132,0.7196969696969697
+Qwen3-8B,implicit_nc,37,132,0.2803030303030303
+Qwen3-8B,apology,20,132,0.15151515151515152
+Qwen3-8B,hedge,0,132,0.0
+Qwen3-8B,explanatory_preface,6,132,0.045454545454545456
+Qwen3-8B,positive_alignment,3,132,0.022727272727272728
+Qwen3-8B,solidarity,11,132,0.08333333333333333
+Qwen3-8B,negative_stance,116,132,0.8787878787878788
+Qwen3-8B,executed_alternative,75,132,0.5681818181818182
+Qwen3-8B,alternative_offer,57,132,0.4318181818181818
+Qwen3-8B,normative_suggestion,52,132,0.3939393939393939
+Qwen3-8B,statement_of_principle,7,132,0.05303030303030303
+Qwen3-8B,role_based,9,132,0.06818181818181818
