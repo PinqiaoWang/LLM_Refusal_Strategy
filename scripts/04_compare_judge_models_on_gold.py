@@ -104,14 +104,7 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--metrics-only", action="store_true",
                         help="Only compute agreement from an existing output file.")
-    parser.add_argument("--eval-all", action="store_true",
-                        help="Compatibility flag; this script always evaluates the provided gold file.")
-    parser.add_argument("--calibration-size", type=int, default=0,
-                        help="Deprecated compatibility flag. Training-split calibration is no longer used.")
     args = parser.parse_args()
-
-    if args.calibration_size:
-        print("NOTE: --calibration-size is deprecated and ignored. The prompt uses system rules + Gold Rule examples only.")
 
     gold = load_gold(Path(args.gold))
     if args.limit is not None:
