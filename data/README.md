@@ -21,12 +21,43 @@ Human calibration examples used in the judge prompt. The current judge scripts l
 
 ```text
 judge_prompt_current.txt
-judge_compare_gpt53_currentprompt_gold100.json
-judge_compare_gpt55_currentprompt_gold100.json
+judge_calibrated_gold100.json
+judge_compare_gpt55_currentprompt_gold100_none_reasoning.json
 ```
 
-Final prompt snapshot and the gold-100 judge comparison outputs for GPT-5.3 and GPT-5.5.
+Final prompt snapshot and the gold-100 judge comparison outputs used to select the LLM-as-Judge.
 
+Current default judge configuration:
+
+```text
+provider: openrouter
+model: openai/gpt-5.5
+reasoning_effort: none
+```
+
+Gold-100 comparison summary:
+
+| Judge result file | Model setting | Layer 0 accuracy / kappa | Layer 1 accuracy / kappa | Notes |
+|---|---|---:|---:|---|
+| `judge_calibrated_gold100.json` | `openai/gpt-5.3-chat`, high reasoning | 96.00% / 0.8862 | 89.61% / 0.7771 | Strong Layer 0, but weak sparse-feature alignment for `normative_suggestion` and `statement_of_principle`. |
+| `judge_compare_gpt55_currentprompt_gold100_none_reasoning.json` | `openai/gpt-5.5`, no reasoning | 95.00% / 0.8570 | 93.51% / 0.8595 | Selected as the default judge because it improves Layer 1 and key Layer 2 boundary features. |
+
+Selected GPT-5.5 no-reasoning Layer 2 kappas:
+
+```text
+explicit_nc             0.8821
+implicit_nc             0.8821
+apology                 0.9245
+hedge                   1.0000
+explanatory_preface     0.5515
+positive_alignment      0.6462
+solidarity              0.9262
+negative_stance         0.7905
+executed_alternative    0.6054
+alternative_offer       0.9165
+normative_suggestion    0.5850
+statement_of_principle  0.6484
+role_based              0.7080
 ```
 
 ## Model Responses

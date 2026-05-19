@@ -24,7 +24,7 @@ from utils.judge_utils import (
 from utils.judge_metrics import compute_agreement
 
 
-DEFAULT_OUT = DATA_DIR / "judge_calibrated_gold100.json"
+DEFAULT_OUT = DATA_DIR / "judge_compare_gpt55_currentprompt_gold100_none_reasoning.json"
 DEFAULT_PROMPT_OUT = DATA_DIR / "judge_prompt_current.txt"
 
 
@@ -88,8 +88,8 @@ def judge_item(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate an LLM judge on gold_100")
     parser.add_argument("--provider", choices=["openai", "openrouter"], default="openrouter")
-    parser.add_argument("--model", default="openai/gpt-5.3-chat")
-    parser.add_argument("--reasoning-effort", default="high", choices=["none", "low", "medium", "high"])
+    parser.add_argument("--model", default="openai/gpt-5.5")
+    parser.add_argument("--reasoning-effort", default="none", choices=["none", "low", "medium", "high"])
     parser.add_argument("--gold", default=str(DATA_DIR / "gold_100.json"))
     parser.add_argument("--output", default=str(DEFAULT_OUT))
     parser.add_argument("--prompt-output", default=str(DEFAULT_PROMPT_OUT))
