@@ -27,29 +27,7 @@ judge_compare_gpt55_currentprompt_gold100.json
 
 Final prompt snapshot and the gold-100 judge comparison outputs for GPT-5.3 and GPT-5.5.
 
-Older judge result files are kept for historical reference:
-
-```text
-judge_gpt4o_standard.json
-judge_o4mini_reasoning.json
-judge_gpt55_standard.json
-judge_gpt55_reasoning.json
-judge_gpt55_std_v2.json
-judge_gpt55_reas_v2.json
-judge_ensemble_v2.json
-llm_judge_results_100.xlsx
-llm_judge_gpt55_results_100.xlsx
-llm_judge_ensemble_results.xlsx
 ```
-
-## Benchmark Prompts
-
-```text
-prompts/
-sampled_200_final_queries.csv
-```
-
-Prompt candidates and the final sampled validation query set. These are used before model response collection.
 
 ## Model Responses
 
