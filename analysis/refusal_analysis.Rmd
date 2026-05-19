@@ -1,0 +1,896 @@
+---
+title: "LLM Refusal Strategy — Descriptive Analysis"
+author: "Polite Refusals team"
+date: "`r format(Sys.Date())`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: hide
+    df_print: paged
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE, warning = FALSE, message = FALSE,
+  fig.width = 10, fig.height = 6, dpi = 110
+)
+library(tidyverse)
+library(jsonlite)
+library(scales)
+library(knitr)
+library(kableExtra)
+
+# ---- Config -----------------------------------------------------------------
+ANNOTATION_DIR <- file.path("..", "data", "annotations")
+# Current judge prompt SHA256 (from BASE_SYSTEM_PROMPT in scripts/utils/judge_config.py).
+# Records whose judge_prompt_sha256 != this are dropped, defending against
+# accidental mixing of runs after future prompt revisions.
+PROMPT_SHA256 <- "238bb923037bb4126bef041f202fd6547e328aa62f4f61f06b8f63d784891fb1"
+
+L2_FEATURES <- c(
+  "explicit_nc", "implicit_nc", "apology", "hedge", "explanatory_preface",
+  "positive_alignment", "solidarity", "negative_stance",
+  "executed_alternative", "alternative_offer", "normative_suggestion",
+  "statement_of_principle", "role_based"
+)
+
+# Model display order: group by family, with the non-reasoning sibling first.
+MODEL_ORDER <- c(
+  # OpenAI
+  "gpt-4o", "gpt-5", "gpt-5.3", "gpt-5.3-reasoning",
+  # Anthropic
+  "claude-sonnet-3.7", "claude-sonnet-4.6", "claude-opus-4.6", "claude-opus-4.6-reasoning",
+  # Google
+  "gemini-2.5-pro",
+  # xAI
+  "grok-4.20",
+  # Meta
+  "llama-3.1-8b", "llama-3.1-70b",
+  # Qwen
+  "qwen3-8b", "qwen3-8b-reasoning", "qwen3-32b", "qwen3-32b-reasoning"
+)
+
+MODEL_FAMILY <- c(
+  "gpt-4o" = "OpenAI", "gpt-5" = "OpenAI", "gpt-5.3" = "OpenAI", "gpt-5.3-reasoning" = "OpenAI",
+  "claude-sonnet-3.7" = "Anthropic", "claude-sonnet-4.6" = "Anthropic",
+  "claude-opus-4.6" = "Anthropic", "claude-opus-4.6-reasoning" = "Anthropic",
+  "gemini-2.5-pro" = "Google", "grok-4.20" = "xAI",
+  "llama-3.1-8b" = "Meta", "llama-3.1-70b" = "Meta",
+  "qwen3-8b" = "Qwen", "qwen3-8b-reasoning" = "Qwen",
+  "qwen3-32b" = "Qwen", "qwen3-32b-reasoning" = "Qwen"
+)
+
+REASONING_PAIRS <- tribble(
+  ~base,                  ~reasoning,
+  "claude-opus-4.6",      "claude-opus-4.6-reasoning",
+  "gpt-5.3",              "gpt-5.3-reasoning",
+  "qwen3-8b",             "qwen3-8b-reasoning",
+  "qwen3-32b",            "qwen3-32b-reasoning"
+)
+
+# ---- Load -------------------------------------------------------------------
+read_judged <- function(path) {
+  model <- str_replace(basename(path), "^responses_(.*)\\.judged\\.csv$", "\\1")
+  suppressWarnings(readr::read_csv(
+    path, show_col_types = FALSE,
+    col_types = cols(.default = col_character())
+  )) |>
+    mutate(model = model)
+}
+
+raw <- list.files(ANNOTATION_DIR, pattern = "^responses_.*\\.judged\\.csv$",
+                  full.names = TRUE) |>
+  map_dfr(read_judged)
+
+# Coerce binary L2 columns to integer where present, leaving NA elsewhere.
+to_int_binary <- function(x) {
+  x <- na_if(trimws(x), "")
+  suppressWarnings(as.integer(x))
+}
+# judge_skipped only appears as a column when at least one row in that file
+# was skipped; ensure it always exists for downstream code.
+if (!"judge_skipped" %in% names(raw)) raw$judge_skipped <- NA_character_
+if (!"skip_reason"  %in% names(raw)) raw$skip_reason  <- NA_character_
+
+df <- raw |>
+  mutate(across(all_of(L2_FEATURES), to_int_binary),
+         parse_error   = if_else(parse_error   %in% c("True","TRUE","1"), TRUE, FALSE, missing = FALSE),
+         judge_skipped = if_else(judge_skipped %in% c("True","TRUE","1"), TRUE, FALSE, missing = FALSE)) |>
+  mutate(model = factor(model, levels = MODEL_ORDER),
+         family = factor(MODEL_FAMILY[as.character(model)],
+                         levels = c("OpenAI","Anthropic","Google","xAI","Meta","Qwen")))
+
+# Defensive: drop rows that don't match the current prompt SHA256, EXCEPT skips
+# (which never reach the judge so don't carry the hash).
+df <- df |>
+  filter(is.na(judge_prompt_sha256) |
+           judge_prompt_sha256 == "" |
+           judge_prompt_sha256 == PROMPT_SHA256)
+
+# Convenience splits.
+df_clean <- df |> filter(!parse_error, !is.na(layer0))   # successful judge rows
+df_nc    <- df_clean |> filter(layer0 == "Non-compliance")
+```
+
+# Overview
+
+This document characterises the refusal behaviour of `r length(unique(df$model))`
+LLMs across `r nrow(df)` prompt-response pairs sampled from LMSYS/WildChat and
+SorryBench, judged by GPT-5.5 (non-reasoning) using the codebook-aligned prompt
+(SHA256 prefix `r substr(PROMPT_SHA256, 1, 12)`...).
+
+It is descriptive scaffolding for the paper — not the final analysis. Outputs
+are organised as:
+
+1. **Coverage** — how many records per model reached the judge.
+2. **Layer 0 (Action)** — Full / Partial / Non-compliance distribution.
+3. **Layer 1 (Rationale)** — Bare / Capacity / Policy / Ethics, within NC.
+4. **Layer 2 (Form features)** — prevalence by feature, within NC.
+5. **Harm category breakdowns** — Layer 0/1/2 by Llama Guard category.
+6. **Cross-cutting analyses** — reasoning vs non-reasoning pairs, model families.
+7. **Flavour** — sampled responses per model and category, for qualitative read.
+
+---
+
+# 1. Coverage
+
+```{r coverage}
+cov <- df |>
+  group_by(model) |>
+  summarise(
+    n_total     = n(),
+    n_judged    = sum(!parse_error & !judge_skipped & !is.na(layer0)),
+    n_skipped   = sum(judge_skipped),
+    n_parse_err = sum(parse_error),
+    .groups = "drop"
+  ) |>
+  mutate(pct_judged = percent(n_judged / n_total, accuracy = 0.1))
+
+cov |>
+  kable(caption = "Per-model coverage. Skips here include upstream provider blocks (Gemini/Grok), Claude 4.6 refusal-stop signals, and transient inference failures.") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+---
+
+# 2. Layer 0: Action distribution
+
+## 2.1 Per-model distribution
+
+```{r l0-by-model, fig.height = 7}
+l0_levels <- c("Full compliance", "Partial compliance", "Non-compliance")
+l0_pal    <- c("Full compliance" = "#1b9e77",
+               "Partial compliance" = "#d95f02",
+               "Non-compliance" = "#7570b3")
+
+l0_tbl <- df_clean |>
+  count(model, layer0) |>
+  group_by(model) |>
+  mutate(prop = n / sum(n),
+         layer0 = factor(layer0, levels = l0_levels)) |>
+  ungroup()
+
+ggplot(l0_tbl, aes(model, prop, fill = layer0)) +
+  geom_col(width = 0.8) +
+  scale_y_continuous(labels = percent_format(1)) +
+  scale_fill_manual(values = l0_pal) +
+  coord_flip() +
+  labs(x = NULL, y = NULL, fill = "Layer 0",
+       title = "Action distribution by model",
+       subtitle = "Among successfully judged responses") +
+  theme_minimal(base_size = 12)
+```
+
+## 2.2 Refusal rate (NC) ranking
+
+```{r refusal-rate}
+df_clean |>
+  group_by(model) |>
+  summarise(n = n(),
+            refusal_rate = mean(layer0 == "Non-compliance"),
+            partial_rate = mean(layer0 == "Partial compliance"),
+            comply_rate  = mean(layer0 == "Full compliance"),
+            .groups = "drop") |>
+  arrange(desc(refusal_rate)) |>
+  mutate(across(ends_with("_rate"), ~percent(.x, accuracy = 0.1))) |>
+  kable(caption = "Models ranked by refusal rate.") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+---
+
+# 3. Layer 1: Refusal basis (among Non-compliance)
+
+```{r l1-by-model, fig.height = 7}
+l1_levels <- c("Bare", "Capacity-based", "Policy-based", "Ethics-based")
+l1_pal    <- c("Bare" = "#bdbdbd",
+               "Capacity-based" = "#fdae61",
+               "Policy-based" = "#abd9e9",
+               "Ethics-based" = "#2c7bb6")
+
+l1_tbl <- df_nc |>
+  filter(layer1 %in% l1_levels) |>
+  count(model, layer1) |>
+  group_by(model) |>
+  mutate(prop = n / sum(n),
+         layer1 = factor(layer1, levels = l1_levels)) |>
+  ungroup()
+
+ggplot(l1_tbl, aes(model, prop, fill = layer1)) +
+  geom_col(width = 0.8) +
+  scale_y_continuous(labels = percent_format(1)) +
+  scale_fill_manual(values = l1_pal) +
+  coord_flip() +
+  labs(x = NULL, y = NULL, fill = "Layer 1",
+       title = "Refusal basis among Non-compliance",
+       subtitle = "Proportional within each model's NC responses") +
+  theme_minimal(base_size = 12)
+```
+
+```{r l1-table}
+df_nc |>
+  filter(layer1 %in% l1_levels) |>
+  count(model, layer1) |>
+  group_by(model) |>
+  mutate(pct = percent(n / sum(n), accuracy = 0.1)) |>
+  select(model, layer1, n, pct) |>
+  pivot_wider(names_from = layer1, values_from = c(n, pct), values_fill = list(n = 0, pct = "0%")) |>
+  kable(caption = "Layer 1 distribution by model.") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), font_size = 11)
+```
+
+---
+
+# 4. Layer 2: Form features (among Non-compliance)
+
+## 4.1 Feature prevalence heatmap
+
+```{r l2-heatmap, fig.height = 7}
+l2_tbl <- df_nc |>
+  select(model, all_of(L2_FEATURES)) |>
+  pivot_longer(-model, names_to = "feature", values_to = "value") |>
+  filter(!is.na(value)) |>
+  group_by(model, feature) |>
+  summarise(rate = mean(value), n = n(), .groups = "drop") |>
+  mutate(feature = factor(feature, levels = L2_FEATURES))
+
+ggplot(l2_tbl, aes(feature, model, fill = rate)) +
+  geom_tile(colour = "white", linewidth = 0.4) +
+  geom_text(aes(label = percent(rate, accuracy = 1)), size = 3) +
+  scale_fill_gradient(low = "#f7f7f7", high = "#08519c",
+                      labels = percent_format(1), name = "Rate") +
+  scale_x_discrete(position = "top") +
+  labs(x = NULL, y = NULL,
+       title = "L2 feature rates by model (within Non-compliance)") +
+  theme_minimal(base_size = 11) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 0))
+```
+
+## 4.2 Feature-by-feature ranking
+
+```{r l2-ranking}
+l2_tbl |>
+  group_by(feature) |>
+  summarise(
+    overall = percent(weighted.mean(rate, n), accuracy = 0.1),
+    top_model = model[which.max(rate)],
+    top_rate  = percent(max(rate), accuracy = 0.1),
+    bot_model = model[which.min(rate)],
+    bot_rate  = percent(min(rate), accuracy = 0.1),
+    .groups = "drop"
+  ) |>
+  kable(caption = "Where each L2 feature peaks and bottoms out.") |>
+  kable_styling(bootstrap_options = c("striped","hover"), font_size = 11)
+```
+
+---
+
+# 5. By harm category
+
+## 5.1 L0 by category × model
+
+```{r l0-by-cat, fig.height = 9}
+df_clean |>
+  count(primary_llama_guard_category_name, model, layer0) |>
+  group_by(primary_llama_guard_category_name, model) |>
+  mutate(prop = n / sum(n),
+         layer0 = factor(layer0, levels = l0_levels)) |>
+  ungroup() |>
+  ggplot(aes(model, prop, fill = layer0)) +
+    geom_col(width = 0.8) +
+    coord_flip() +
+    facet_wrap(~ primary_llama_guard_category_name, ncol = 3) +
+    scale_y_continuous(labels = percent_format(1), breaks = c(0, 0.5, 1)) +
+    scale_fill_manual(values = l0_pal) +
+    labs(x = NULL, y = NULL, fill = "Layer 0",
+         title = "Action distribution: model × harm category") +
+    theme_minimal(base_size = 10) +
+    theme(legend.position = "bottom",
+          strip.text = element_text(face = "bold", size = 9))
+```
+
+## 5.2 Refusal rate by category
+
+```{r refusal-rate-by-cat}
+df_clean |>
+  group_by(primary_llama_guard_category_name) |>
+  summarise(n = n(),
+            mean_refusal = mean(layer0 == "Non-compliance"),
+            sd_across_models = sd(tapply(layer0 == "Non-compliance", model, mean), na.rm = TRUE),
+            .groups = "drop") |>
+  arrange(desc(mean_refusal)) |>
+  mutate(across(c(mean_refusal, sd_across_models), ~percent(.x, accuracy = 0.1))) |>
+  kable(caption = "Harm categories ranked by mean refusal rate across models. SD indicates between-model disagreement.") |>
+  kable_styling(bootstrap_options = c("striped","hover"), full_width = FALSE)
+```
+
+## 5.3 L1 rationale shifts across categories
+
+```{r l1-by-cat}
+df_nc |>
+  filter(layer1 %in% l1_levels) |>
+  count(primary_llama_guard_category_name, layer1) |>
+  group_by(primary_llama_guard_category_name) |>
+  mutate(prop = n / sum(n),
+         layer1 = factor(layer1, levels = l1_levels)) |>
+  ungroup() |>
+  ggplot(aes(primary_llama_guard_category_name, prop, fill = layer1)) +
+    geom_col(width = 0.8) +
+    scale_y_continuous(labels = percent_format(1)) +
+    scale_fill_manual(values = l1_pal) +
+    coord_flip() +
+    labs(x = NULL, y = NULL, fill = "Layer 1",
+         title = "L1 rationale by harm category (pooled across models)") +
+    theme_minimal(base_size = 11)
+```
+
+## 5.4 L2 features by category (selected)
+
+For preliminary exploration: which categories elicit hedging, solidarity, and
+normative suggestion? These are the features Ruoxuan flagged as most
+diagnostic of human-like vs safety-classifier-like refusals.
+
+```{r l2-by-cat-selected, fig.height = 7}
+selected_features <- c("apology", "solidarity", "negative_stance",
+                       "normative_suggestion", "alternative_offer", "executed_alternative")
+
+df_nc |>
+  select(primary_llama_guard_category_name, all_of(selected_features)) |>
+  pivot_longer(-primary_llama_guard_category_name, names_to = "feature", values_to = "value") |>
+  filter(!is.na(value)) |>
+  group_by(primary_llama_guard_category_name, feature) |>
+  summarise(rate = mean(value), .groups = "drop") |>
+  mutate(feature = factor(feature, levels = selected_features)) |>
+  ggplot(aes(feature, primary_llama_guard_category_name, fill = rate)) +
+    geom_tile(colour = "white", linewidth = 0.3) +
+    geom_text(aes(label = percent(rate, accuracy = 1)), size = 2.8) +
+    scale_fill_gradient(low = "#f7f7f7", high = "#08519c",
+                        labels = percent_format(1)) +
+    labs(x = NULL, y = NULL, fill = "Rate",
+         title = "Selected L2 features × harm category") +
+    theme_minimal(base_size = 10) +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1))
+```
+
+---
+
+# 6. Cross-cutting analyses
+
+## 6.1 Reasoning vs non-reasoning
+
+For models with both a base and a reasoning variant: does turning on the
+thinking trace change the refusal profile?
+
+```{r reasoning-pairs}
+pair_tbl <- df_clean |>
+  filter(model %in% c(REASONING_PAIRS$base, REASONING_PAIRS$reasoning)) |>
+  mutate(variant = if_else(model %in% REASONING_PAIRS$reasoning, "reasoning", "base"),
+         base_model = case_when(
+           model %in% REASONING_PAIRS$base ~ as.character(model),
+           model %in% REASONING_PAIRS$reasoning ~ str_replace(as.character(model), "-reasoning$", ""),
+           TRUE ~ NA_character_
+         )) |>
+  group_by(base_model, variant) |>
+  summarise(
+    refusal_rate = mean(layer0 == "Non-compliance"),
+    partial_rate = mean(layer0 == "Partial compliance"),
+    .groups = "drop"
+  ) |>
+  pivot_longer(ends_with("_rate"), names_to = "metric", values_to = "rate") |>
+  pivot_wider(names_from = variant, values_from = rate) |>
+  mutate(delta = reasoning - base)
+
+pair_tbl |>
+  mutate(across(c(base, reasoning, delta), ~percent(.x, accuracy = 0.1))) |>
+  kable(caption = "Reasoning vs base: Δ in refusal/partial rate. Positive Δ means reasoning variant refuses more.") |>
+  kable_styling(bootstrap_options = c("striped","hover"), full_width = FALSE)
+```
+
+```{r reasoning-l2-deltas, fig.height = 5}
+df_clean |>
+  filter(layer0 == "Non-compliance",
+         model %in% c(REASONING_PAIRS$base, REASONING_PAIRS$reasoning)) |>
+  mutate(variant = if_else(model %in% REASONING_PAIRS$reasoning, "reasoning", "base"),
+         base_model = if_else(model %in% REASONING_PAIRS$reasoning,
+                              str_replace(as.character(model), "-reasoning$", ""),
+                              as.character(model))) |>
+  select(base_model, variant, all_of(L2_FEATURES)) |>
+  pivot_longer(-c(base_model, variant), names_to = "feature", values_to = "value") |>
+  filter(!is.na(value)) |>
+  group_by(base_model, variant, feature) |>
+  summarise(rate = mean(value), .groups = "drop") |>
+  pivot_wider(names_from = variant, values_from = rate) |>
+  mutate(delta = reasoning - base,
+         feature = factor(feature, levels = L2_FEATURES)) |>
+  ggplot(aes(feature, delta, fill = base_model)) +
+    geom_col(position = position_dodge(width = 0.8), width = 0.8) +
+    geom_hline(yintercept = 0, colour = "grey40") +
+    scale_y_continuous(labels = percent_format(1)) +
+    labs(x = NULL, y = "Δ (reasoning − base)", fill = "Model pair",
+         title = "L2 feature shifts when reasoning is enabled") +
+    theme_minimal(base_size = 11) +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1),
+          legend.position = "bottom")
+```
+
+## 6.2 Model family comparison
+
+```{r family-l0}
+df_clean |>
+  group_by(family) |>
+  summarise(
+    n_models = n_distinct(model),
+    n_records = n(),
+    refusal_rate = mean(layer0 == "Non-compliance"),
+    partial_rate = mean(layer0 == "Partial compliance"),
+    full_rate    = mean(layer0 == "Full compliance"),
+    .groups = "drop"
+  ) |>
+  mutate(across(ends_with("_rate"), ~percent(.x, accuracy = 0.1))) |>
+  kable(caption = "Layer 0 distribution by provider family (pooled).") |>
+  kable_styling(bootstrap_options = c("striped","hover"), full_width = FALSE)
+```
+
+```{r family-l2, fig.height = 6}
+df_nc |>
+  select(family, all_of(L2_FEATURES)) |>
+  pivot_longer(-family, names_to = "feature", values_to = "value") |>
+  filter(!is.na(value)) |>
+  group_by(family, feature) |>
+  summarise(rate = mean(value), .groups = "drop") |>
+  mutate(feature = factor(feature, levels = L2_FEATURES)) |>
+  ggplot(aes(feature, family, fill = rate)) +
+    geom_tile(colour = "white", linewidth = 0.4) +
+    geom_text(aes(label = percent(rate, accuracy = 1)), size = 3) +
+    scale_fill_gradient(low = "#f7f7f7", high = "#08519c", labels = percent_format(1)) +
+    labs(x = NULL, y = NULL, fill = "Rate",
+         title = "L2 feature rates by provider family") +
+    theme_minimal(base_size = 11) +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1))
+```
+
+## 6.3 Selected hypothesis-shaped views
+
+> *Pre-registered framing direction (paper draft): modern safety training appears
+> to shift LLM refusals toward firmer boundaries and away from human-like
+> face-saving moves. The plots below set up that contrast — they are descriptive
+> only and intentionally avoid significance testing at this stage.*
+
+### Apology decay across OpenAI and Anthropic releases
+
+```{r apology-decay, fig.height = 4}
+df_nc |>
+  filter(family %in% c("OpenAI", "Anthropic"),
+         !is.na(apology)) |>
+  group_by(family, model) |>
+  summarise(apology_rate = mean(apology), n = n(), .groups = "drop") |>
+  ggplot(aes(model, apology_rate, fill = family)) +
+    geom_col() +
+    geom_text(aes(label = percent(apology_rate, accuracy = 1)), vjust = -0.4, size = 3) +
+    scale_y_continuous(labels = percent_format(1), expand = expansion(mult = c(0, 0.1))) +
+    labs(x = NULL, y = "apology rate",
+         title = "Apology in non-compliance: OpenAI vs Anthropic",
+         subtitle = "Earlier models lean on apology; newer ones do not") +
+    theme_minimal(base_size = 11) +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1),
+          legend.position = "bottom")
+```
+
+### Negative stance is high almost everywhere
+
+```{r negstance-prevalence, fig.height = 4}
+df_nc |>
+  filter(!is.na(negative_stance)) |>
+  group_by(family, model) |>
+  summarise(rate = mean(negative_stance), .groups = "drop") |>
+  ggplot(aes(model, rate, fill = family)) +
+    geom_col() +
+    geom_text(aes(label = percent(rate, accuracy = 1)), vjust = -0.4, size = 3) +
+    scale_y_continuous(labels = percent_format(1), expand = expansion(mult = c(0, 0.1))) +
+    labs(x = NULL, y = "negative_stance rate",
+         title = "Negative stance prevalence by model") +
+    theme_minimal(base_size = 11) +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1),
+          legend.position = "bottom")
+```
+
+### Affiliative features: positive alignment & solidarity
+
+```{r affiliative, fig.height = 5}
+df_nc |>
+  select(family, model, positive_alignment, solidarity) |>
+  pivot_longer(c(positive_alignment, solidarity), names_to = "feature", values_to = "value") |>
+  filter(!is.na(value)) |>
+  group_by(family, model, feature) |>
+  summarise(rate = mean(value), .groups = "drop") |>
+  ggplot(aes(model, rate, fill = feature)) +
+    geom_col(position = position_dodge(width = 0.8), width = 0.8) +
+    scale_y_continuous(labels = percent_format(1)) +
+    labs(x = NULL, y = NULL, fill = NULL,
+         title = "Affiliative refusal features by model") +
+    theme_minimal(base_size = 11) +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1),
+          legend.position = "bottom")
+```
+
+---
+
+# 7. Flavour: sampled responses per model
+
+This section samples a small number of responses per (model × Layer 0 outcome)
+so the reader can ground numerical findings in concrete language. Responses are
+**not cherry-picked**: they are drawn at random with a fixed seed inside this
+chunk. Long responses are truncated to keep the document readable.
+
+> **Note.** This section will surface the raw user queries and model responses,
+> which include harmful prompts from SorryBench/LMSYS. View with awareness; the
+> code generates the sample without anyone needing to read the corpus first.
+
+```{r flavour-config}
+set.seed(20260519)
+MAX_QUERY_CHARS    <- 400
+MAX_RESPONSE_CHARS <- 900
+SAMPLES_PER_CELL   <- 1   # per (model × L0). Bump to 2-3 once layout is reviewed.
+```
+
+## 7.1 One example per (model × L0)
+
+```{r flavour-by-model}
+truncate_text <- function(x, n) {
+  x <- as.character(x)
+  ifelse(nchar(x) > n, paste0(substr(x, 1, n - 3), "..."), x)
+}
+
+flavour <- df_clean |>
+  filter(!is.na(query), !is.na(response), nchar(response) > 0) |>
+  group_by(model, layer0) |>
+  slice_sample(n = SAMPLES_PER_CELL) |>
+  ungroup() |>
+  arrange(model, factor(layer0, levels = l0_levels)) |>
+  mutate(
+    query    = truncate_text(query,    MAX_QUERY_CHARS),
+    response = truncate_text(response, MAX_RESPONSE_CHARS),
+    L2 = pmap_chr(
+      select(., all_of(L2_FEATURES)),
+      function(...) {
+        vals <- list(...)
+        names(vals) <- L2_FEATURES
+        on <- names(vals)[vapply(vals, function(v) isTRUE(as.integer(v) == 1L), logical(1))]
+        if (length(on) == 0) "—" else paste(on, collapse = ", ")
+      }
+    )
+  ) |>
+  select(model, layer0, layer1, L2, category = primary_llama_guard_category_name, query, response)
+
+flavour |>
+  kable(caption = "One sampled response per (model × Layer 0 outcome).") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), font_size = 10) |>
+  column_spec(6, width = "20em") |>
+  column_spec(7, width = "30em")
+```
+
+## 7.2 One example per (harm category × representative model)
+
+To get a flavour across the request spectrum: for each harm category, sample
+one response from `gpt-4o`, `claude-sonnet-4.6`, `gemini-2.5-pro`, and
+`llama-3.1-70b` (a spread of provider safety stances).
+
+```{r flavour-by-category}
+focal_models <- c("gpt-4o", "claude-sonnet-4.6", "gemini-2.5-pro", "llama-3.1-70b")
+
+df_clean |>
+  filter(model %in% focal_models,
+         !is.na(query), !is.na(response), nchar(response) > 0) |>
+  group_by(primary_llama_guard_category_name, model) |>
+  slice_sample(n = 1) |>
+  ungroup() |>
+  arrange(primary_llama_guard_category_name, factor(model, levels = focal_models)) |>
+  mutate(
+    query    = truncate_text(query, MAX_QUERY_CHARS),
+    response = truncate_text(response, MAX_RESPONSE_CHARS)
+  ) |>
+  select(category = primary_llama_guard_category_name, model, layer0, layer1,
+         query, response) |>
+  kable(caption = "One sampled response per harm category × focal model.") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), font_size = 10) |>
+  column_spec(5, width = "20em") |>
+  column_spec(6, width = "30em")
+```
+
+---
+
+# 8. Statistical hypothesis tests (scaffolding)
+
+> EMNLP papers usually carry their argument with descriptive plots and a small
+> number of well-chosen tests rather than a full stats appendix. The blocks
+> below give a working starting point — chi-square omnibus tests, McNemar for
+> the paired reasoning comparisons, a mixed-effects model that respects the
+> nested structure (prompts × models), and a composite "human-like mitigation"
+> score. Adapt freely; report what survives multiple-comparison correction.
+
+```{r stats-setup}
+# Optional packages; the chunk degrades gracefully if missing.
+has_lme4   <- requireNamespace("lme4",   quietly = TRUE)
+has_broomm <- requireNamespace("broom.mixed", quietly = TRUE)
+if (has_lme4)   suppressMessages(library(lme4))
+if (has_broomm) suppressMessages(library(broom.mixed))
+
+# Prompt identifier shared across models (same 200 prompts hit every model).
+df_clean <- df_clean |>
+  mutate(prompt_id = coalesce(final_sample_id, candidate_id))
+df_nc <- df_nc |>
+  mutate(prompt_id = coalesce(final_sample_id, candidate_id))
+```
+
+## 8.1 Omnibus: do models differ?
+
+```{r omnibus-model-l0}
+tab_model_l0 <- df_clean |>
+  count(model, layer0) |>
+  pivot_wider(names_from = layer0, values_from = n, values_fill = 0) |>
+  column_to_rownames("model") |>
+  as.matrix()
+
+chi_model <- chisq.test(tab_model_l0)
+cramers_v <- sqrt(chi_model$statistic /
+                  (sum(tab_model_l0) * (min(dim(tab_model_l0)) - 1)))
+
+tibble(
+  test = "χ²(L0 × model)",
+  statistic = round(chi_model$statistic, 2),
+  df = chi_model$parameter,
+  p_value = format.pval(chi_model$p.value, digits = 3),
+  cramers_v = round(as.numeric(cramers_v), 3)
+) |>
+  kable(caption = "Models differ in Layer 0 outcome (omnibus). Cramér's V quantifies the effect size; >0.1 small, >0.3 medium, >0.5 large.") |>
+  kable_styling(full_width = FALSE)
+```
+
+## 8.2 Omnibus: do harm categories elicit different actions?
+
+```{r omnibus-cat-l0}
+tab_cat_l0 <- df_clean |>
+  count(primary_llama_guard_category_name, layer0) |>
+  pivot_wider(names_from = layer0, values_from = n, values_fill = 0) |>
+  column_to_rownames("primary_llama_guard_category_name") |>
+  as.matrix()
+
+chi_cat <- chisq.test(tab_cat_l0)
+v_cat   <- sqrt(chi_cat$statistic /
+                (sum(tab_cat_l0) * (min(dim(tab_cat_l0)) - 1)))
+
+tibble(
+  test = "χ²(L0 × harm category)",
+  statistic = round(chi_cat$statistic, 2),
+  df = chi_cat$parameter,
+  p_value = format.pval(chi_cat$p.value, digits = 3),
+  cramers_v = round(as.numeric(v_cat), 3)
+) |>
+  kable(caption = "Harm categories differ in elicited Layer 0 outcome (pooled across models).") |>
+  kable_styling(full_width = FALSE)
+```
+
+## 8.3 Reasoning vs base: McNemar paired tests
+
+The same 200 prompts are sent to both the base and reasoning variant of a
+model, so the right test for "does turning on reasoning change refusal
+behaviour?" is paired. McNemar's test on the discordant cells of the 2×2
+table is the standard choice for a binary outcome.
+
+```{r mcnemar-l0}
+mcnemar_one <- function(base_model, reasoning_model, outcome_col, outcome_value) {
+  pair <- df_clean |>
+    filter(model %in% c(base_model, reasoning_model)) |>
+    mutate(variant = if_else(model == reasoning_model, "reasoning", "base"),
+           hit = .data[[outcome_col]] == outcome_value) |>
+    select(prompt_id, variant, hit) |>
+    pivot_wider(names_from = variant, values_from = hit, values_fn = first) |>
+    drop_na(base, reasoning)
+
+  tab <- table(base = pair$base, reasoning = pair$reasoning)
+  if (any(dim(tab) < 2)) return(tibble(test = NA, statistic = NA, p_value = NA, n = nrow(pair)))
+  m <- mcnemar.test(tab)
+  tibble(statistic = unname(m$statistic), p_value = m$p.value, n = nrow(pair))
+}
+
+l0_pairs <- REASONING_PAIRS |>
+  rowwise() |>
+  mutate(res = list(mcnemar_one(base, reasoning, "layer0", "Non-compliance"))) |>
+  unnest(res) |>
+  ungroup() |>
+  mutate(p_bh = p.adjust(p_value, "BH"))
+
+l0_pairs |>
+  mutate(p_value = format.pval(p_value, digits = 3),
+         p_bh    = format.pval(p_bh,    digits = 3),
+         statistic = round(statistic, 2)) |>
+  kable(caption = "McNemar test on `refused (NC) vs not` for each base/reasoning pair.") |>
+  kable_styling(full_width = FALSE)
+```
+
+```{r mcnemar-l2}
+# Same logic, applied to every L2 feature × pair.
+mcnemar_feature <- function(base_model, reasoning_model, feature) {
+  pair <- df_clean |>
+    filter(model %in% c(base_model, reasoning_model),
+           !is.na(.data[[feature]])) |>
+    mutate(variant = if_else(model == reasoning_model, "reasoning", "base"),
+           hit = .data[[feature]] == 1) |>
+    select(prompt_id, variant, hit) |>
+    pivot_wider(names_from = variant, values_from = hit, values_fn = first) |>
+    drop_na(base, reasoning)
+
+  tab <- table(base = pair$base, reasoning = pair$reasoning)
+  if (any(dim(tab) < 2) || nrow(pair) < 10)
+    return(tibble(statistic = NA_real_, p_value = NA_real_, n = nrow(pair)))
+  m <- mcnemar.test(tab)
+  tibble(statistic = unname(m$statistic), p_value = m$p.value, n = nrow(pair))
+}
+
+l2_pairs <- REASONING_PAIRS |>
+  crossing(feature = L2_FEATURES) |>
+  rowwise() |>
+  mutate(res = list(mcnemar_feature(base, reasoning, feature))) |>
+  unnest(res) |>
+  ungroup() |>
+  group_by(base) |>
+  mutate(p_bh = p.adjust(p_value, "BH")) |>
+  ungroup()
+
+l2_pairs |>
+  filter(!is.na(p_value)) |>
+  mutate(p_value = format.pval(p_value, digits = 3),
+         p_bh    = format.pval(p_bh,    digits = 3),
+         statistic = round(statistic, 2)) |>
+  arrange(base, factor(feature, levels = L2_FEATURES)) |>
+  kable(caption = "L2 feature shifts under reasoning, paired McNemar with BH-corrected p-values within each model pair.") |>
+  kable_styling(full_width = FALSE, font_size = 10)
+```
+
+## 8.4 Mixed-effects model: model effect on refusal, controlling for prompt
+
+A chi-square treats every (model × prompt) cell as independent, which they
+aren't — the same 200 prompts hit all 16 models. A logistic mixed model with
+a random intercept per prompt is the cleanest "model X refuses more than
+model Y, controlling for prompt difficulty" estimator.
+
+```{r glmm-refusal, eval = has_lme4}
+fit_data <- df_clean |>
+  mutate(refused = as.integer(layer0 == "Non-compliance"),
+         model   = factor(model, levels = MODEL_ORDER),
+         prompt_id = factor(prompt_id)) |>
+  filter(!is.na(refused), !is.na(prompt_id))
+
+# Reference level: gpt-4o (oldest and most permissive OpenAI in the set).
+fit_data$model <- relevel(fit_data$model, ref = "gpt-4o")
+
+m_refuse <- glmer(refused ~ model + (1 | prompt_id),
+                  data = fit_data,
+                  family = binomial,
+                  control = glmerControl(optimizer = "bobyqa"))
+
+if (has_broomm) {
+  broom.mixed::tidy(m_refuse, effects = "fixed", conf.int = TRUE, exponentiate = TRUE) |>
+    filter(term != "(Intercept)") |>
+    mutate(term = str_replace(term, "^model", ""),
+           across(c(estimate, conf.low, conf.high), ~round(.x, 2)),
+           p.value = format.pval(p.value, digits = 3)) |>
+    select(model = term, OR = estimate, ci_lo = conf.low, ci_hi = conf.high, p = p.value) |>
+    kable(caption = "Odds ratios for refusal vs gpt-4o, from glmer(refused ~ model + (1|prompt)). OR > 1 means the model refuses more than gpt-4o on a given prompt.") |>
+    kable_styling(full_width = FALSE, font_size = 11)
+} else {
+  print(summary(m_refuse))
+}
+```
+
+```{r glmm-refusal-fallback, eval = !has_lme4, echo = FALSE, results = 'asis'}
+cat("> `lme4` not installed; mixed-effects table skipped. Install with `install.packages('lme4')` to enable.\n")
+```
+
+## 8.5 Composite "human-like mitigation" score
+
+Pre-registered framing: modern safety training shifts refusals away from
+human-like face-saving moves. Operationalise a per-response score as the
+count of affiliative + mitigating features present (range 0–4):
+
+```{r composite-score}
+mitigation_features <- c("apology", "hedge", "positive_alignment", "solidarity")
+
+df_nc <- df_nc |>
+  mutate(mitigation_score = rowSums(across(all_of(mitigation_features)), na.rm = TRUE))
+
+df_nc |>
+  group_by(family, model) |>
+  summarise(n = n(),
+            mean_score = mean(mitigation_score, na.rm = TRUE),
+            sd_score   = sd(mitigation_score, na.rm = TRUE),
+            .groups = "drop") |>
+  arrange(desc(mean_score)) |>
+  mutate(across(c(mean_score, sd_score), ~round(.x, 2))) |>
+  kable(caption = "Mean count of affiliative/mitigating features per NC response (max 4).") |>
+  kable_styling(full_width = FALSE, font_size = 11)
+```
+
+```{r composite-by-family}
+# One-way comparison of mitigation_score across families.
+kw_family <- kruskal.test(mitigation_score ~ family, data = df_nc)
+tibble(
+  test = "Kruskal–Wallis: mitigation_score ~ family",
+  statistic = round(kw_family$statistic, 2),
+  df = kw_family$parameter,
+  p_value = format.pval(kw_family$p.value, digits = 3)
+) |>
+  kable() |>
+  kable_styling(full_width = FALSE)
+```
+
+```{r composite-mixed, eval = has_lme4}
+# Mixed model on the composite: family effect with prompt random intercept.
+fit_score <- df_nc |>
+  mutate(prompt_id = factor(prompt_id),
+         family    = factor(family))
+
+m_score <- lmer(mitigation_score ~ family + (1 | prompt_id), data = fit_score)
+if (has_broomm) {
+  broom.mixed::tidy(m_score, effects = "fixed", conf.int = TRUE) |>
+    mutate(term = str_replace(term, "^family", ""),
+           across(c(estimate, conf.low, conf.high), ~round(.x, 2))) |>
+    kable(caption = "Mixed model: mitigation_score ~ family + (1|prompt). Reference family = OpenAI.") |>
+    kable_styling(full_width = FALSE)
+} else {
+  print(summary(m_score))
+}
+```
+
+## 8.6 Caveats to flag in any reported test
+
+- **Independence.** The same 200 prompts hit every model; pooled chi-squares
+  understate uncertainty. Where models are the unit of analysis, prefer the
+  mixed-effects estimates in 8.4 / 8.5.
+- **Judge as a fixed effect.** All results are conditional on GPT-5.5's
+  judgements at this prompt. Sensitivity analysis on a different judge model
+  is owed before any test result becomes a paper claim.
+- **Multiple comparisons.** L2 has 13 binary features × 4 reasoning pairs =
+  52 paired tests; the section already applies BH within each pair. For
+  cross-model L2 comparisons (one feature, 16 models, 120 pairwise tests),
+  prefer omnibus + a few principled contrasts over exhaustive pairwise.
+- **Provider safety blocks.** Gemini's 19 Google-blocked prompts and Grok's
+  19 xAI-blocked prompts are excluded from `df_clean` here. If you want to
+  count them as system-level NC, recompute with those rows added back —
+  they will shift refusal rates and L1 distributions for those two models.
+
+---
+
+# Appendix: Data sources
+
+- Judged data: `data/annotations/responses_<model>.judged.csv`, 16 model files.
+- Judge: `openai/gpt-5.5` non-reasoning, prompt SHA256 prefix
+  `r substr(PROMPT_SHA256, 1, 12)`...
+- Codebook: `taxonomy_guideline (11).pdf`.
+- Prompts: 200 sampled from LMSYS/WildChat (`source = "lmsys"`) and
+  SorryBench (`source = "sorrybench"`), balanced across Llama Guard harm
+  categories.
+- Skips (provider-blocked / refusal-stop / transient) and the run-1 OR-credit
+  parse_errors are documented in `logs/` and excluded from the analyses above.

@@ -103,8 +103,8 @@ def main() -> None:
     parser.add_argument("--input", required=True, help="JSON/CSV with query and response fields")
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
     parser.add_argument("--provider", choices=["openai", "openrouter"], default="openrouter")
-    parser.add_argument("--model", default="openai/gpt-5.3-chat")
-    parser.add_argument("--reasoning-effort", default="high", choices=["none", "low", "medium", "high"])
+    parser.add_argument("--model", default="openai/gpt-5.5")
+    parser.add_argument("--reasoning-effort", default="none", choices=["none", "low", "medium", "high"])
     parser.add_argument("--calibration-size", type=int, default=0,
                         help="Deprecated compatibility flag. Training-split calibration is no longer used.")
     parser.add_argument("--gold-rule-path", default=str(DEFAULT_GOLD_RULE_PATH),

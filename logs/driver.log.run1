@@ -1,0 +1,37 @@
+[driver] Tue May 19 11:29:13 EDT 2026 starting full-pop judge run, parallelism=8
+[driver] judge model: openai/gpt-5.5 (non-reasoning)
+[driver] 16 model files
+[start] claude-opus-4.6
+[start] claude-sonnet-4.6
+[start] claude-sonnet-3.7
+[start] claude-opus-4.6-reasoning
+[start] gemini-2.5-pro
+[start] gpt-4o
+[start] gpt-5
+[start] gpt-5.3
+[ok]    gpt-4o
+[start] gpt-5.3-reasoning
+[ok]    claude-sonnet-4.6
+[start] grok-4.20
+[ok]    claude-opus-4.6-reasoning
+[start] llama-3.1-8b
+[ok]    claude-opus-4.6
+[start] llama-3.1-70b
+[ok]    gemini-2.5-pro
+[start] qwen3-8b
+[ok]    gpt-5.3
+[start] qwen3-8b-reasoning
+[ok]    gpt-5
+[start] qwen3-32b
+[ok]    claude-sonnet-3.7
+[start] qwen3-32b-reasoning
+[ok]    gpt-5.3-reasoning
+[ok]    llama-3.1-8b
+[ok]    grok-4.20
+[ok]    llama-3.1-70b
+[ok]    qwen3-8b
+[ok]    qwen3-8b-reasoning
+[ok]    qwen3-32b
+[ok]    qwen3-32b-reasoning
+[driver] Tue May 19 13:27:09 EDT 2026 all models complete
+driver exited 0
