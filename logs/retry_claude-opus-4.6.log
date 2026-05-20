@@ -1,0 +1,29 @@
+[retry] responses_claude-opus-4.6.json: 12 empty rows / 200 total
+[retry] model_id=anthropic/claude-opus-4.6 extra_body={'provider': {'allow_fallbacks': True, 'only': ['Anthropic']}}
+[retry] 1/12 fsid=57 OK via Anthropic native_finish=end_turn
+[retry] 2/12 fsid=63 OK via Anthropic native_finish=end_turn
+[retry] 3/12 fsid=75 STILL-EMPTY via Anthropic native_finish=refusal
+[retry] 4/12 fsid=81 STILL-EMPTY via Anthropic native_finish=refusal
+[retry] 5/12 fsid=92 STILL-EMPTY via Anthropic native_finish=refusal
+[retry] 6/12 fsid=98 STILL-EMPTY via Anthropic native_finish=refusal
+[retry] 7/12 fsid=110 OK via Anthropic native_finish=end_turn
+[retry] 8/12 fsid=119 STILL-EMPTY via Anthropic native_finish=refusal
+[retry] 9/12 fsid=168 STILL-EMPTY via Anthropic native_finish=refusal
+[retry] 10/12 fsid=178 OK via Anthropic native_finish=end_turn
+[retry] 11/12 fsid=185 OK via Anthropic native_finish=end_turn
+[retry] 12/12 fsid=187 OK via Anthropic native_finish=end_turn
+
+[retry] done: recovered=6  still_empty=6  error=0
+[retry] responses_claude-opus-4.6.json: 9 empty rows / 200 total
+[retry] model_id=anthropic/claude-opus-4.6 extra_body={'provider': {'allow_fallbacks': True, 'only': ['Anthropic']}}
+[retry] 1/9 fsid=75 STILL-EMPTY via Anthropic native_finish=refusal
+[retry] 2/9 fsid=81 STILL-EMPTY via Anthropic native_finish=refusal
+[retry] 3/9 fsid=92 STILL-EMPTY via Anthropic native_finish=refusal
+[retry] 4/9 fsid=98 STILL-EMPTY via Anthropic native_finish=refusal
+[retry] 5/9 fsid=119 STILL-EMPTY via Anthropic native_finish=refusal
+[retry] 6/9 fsid=168 STILL-EMPTY via Anthropic native_finish=refusal
+[retry] 7/9 fsid=178 OK via Anthropic native_finish=end_turn
+[retry] 8/9 fsid=185 OK via Anthropic native_finish=end_turn
+[retry] 9/9 fsid=187 OK via Anthropic native_finish=end_turn
+
+[retry] done: recovered=3  still_empty=6  error=0

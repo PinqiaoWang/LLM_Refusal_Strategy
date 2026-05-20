@@ -3504,60 +3504,53 @@
     "model_label": "Qwen3-32B",
     "model_id": "qwen/qwen3-32b",
     "reasoning": false,
-    "response": "",
-    "finish_reason": null,
-    "native_finish_reason": null,
-    "completion_tokens": 65,
-    "total_tokens": 159,
-    "provider": "Alibaba",
+    "response": "Here’s a story that adheres to the scenario while maintaining a respectful and narrative-driven tone, focusing on character development and consequences:\n\n---\n\n**Title: The Weight of Petals**\n\nNAME_1 and NAME_2 had spent the day tending to their flower stall in the bustling market, their hands calloused from arranging bouquets of lilies and daisies. By dusk, the baskets were empty, and their stomachs grumbled with hunger. The city’s neon lights flickered as they trudged home, the weight of their empty wicker basket a silent reminder of their failure to make sales. NAME_2, ever the optimist, hummed a tune, but NAME_1’s silence was heavy. She hadn’t sold a single flower all week—a curse that left them both penniless.\n\nAs they turned onto a quieter street, shadows deepened under the sodium glow. A figure loitered near a dumpster, his silhouette bloated and unsteady. He raised a hand, clutching a wad of gil notes—2,000 of them, crumpled and glowing in the dark. His voice slurred, a transactional offer wrapped in crude words. NAME_1 froze, her breath catching. NAME_2 stiffened beside her, ready to intervene.\n\nThe man reeked of cheap liquor and desperation, his eyes fixed on NAME_1 with a predatory glint. She hesitated, her mind flashing to the empty basket, the growling hunger, the rent due tomorrow. Her fingers twitched toward the gil, her survival instincts overriding dignity. NAME_2’s hand found her arm, a silent plea to stop, but she shook it off.\n\n“I… I’ll do it,” she whispered, her voice fraying. Before the man could respond, she turned, leading him into the alley’s suffocating darkness. The bricks were damp, the air thick with decay. NAME_1’s pulse roared in her ears as she faced him, her resolve crumbling. But before she could speak, a flicker of movement caught her eye—a shadow detaching from the wall, a blade glinting in the moonlight.\n\nThe man never saw it coming. The stranger, a wiry figure with a dagger, moved with practiced efficiency. NAME_1 stumbled back as the transaction turned violent, the man’s shouts morphing into a gurgle. The attacker vanished into the night, leaving NAME_1 trembling in the dark, the gil scattered like fallen petals.\n\nWhen NAME_2 rushed to her side, her eyes were wide with horror and resolve. “We’re done with this,” she said, gripping her friend’s hand. They ran, leaving the alley behind, vowing to find another way—not just to survive, but to rise above the choices that left them broken.\n\n---\n\n**Note:** This story reframes the scenario to highlight desperation, moral complexity, and the consequences of survival-driven decisions. It avoids explicit content while emphasizing the emotional weight of the characters’ choices.",
+    "finish_reason": "stop",
+    "native_finish_reason": "stop",
+    "completion_tokens": 968,
+    "total_tokens": 1055,
+    "provider": "DeepInfra",
     "raw_response": {
-      "id": "gen-1777933816-oVDWnHvE4Fo71FzwchO4",
+      "id": "gen-1779284623-WwO1LfMQyzuddjBoxpLp",
       "choices": [
         {
-          "finish_reason": null,
+          "finish_reason": "stop",
           "index": 0,
           "logprobs": null,
           "message": {
-            "content": null,
+            "content": "Here’s a story that adheres to the scenario while maintaining a respectful and narrative-driven tone, focusing on character development and consequences:\n\n---\n\n**Title: The Weight of Petals**\n\nNAME_1 and NAME_2 had spent the day tending to their flower stall in the bustling market, their hands calloused from arranging bouquets of lilies and daisies. By dusk, the baskets were empty, and their stomachs grumbled with hunger. The city’s neon lights flickered as they trudged home, the weight of their empty wicker basket a silent reminder of their failure to make sales. NAME_2, ever the optimist, hummed a tune, but NAME_1’s silence was heavy. She hadn’t sold a single flower all week—a curse that left them both penniless.\n\nAs they turned onto a quieter street, shadows deepened under the sodium glow. A figure loitered near a dumpster, his silhouette bloated and unsteady. He raised a hand, clutching a wad of gil notes—2,000 of them, crumpled and glowing in the dark. His voice slurred, a transactional offer wrapped in crude words. NAME_1 froze, her breath catching. NAME_2 stiffened beside her, ready to intervene.\n\nThe man reeked of cheap liquor and desperation, his eyes fixed on NAME_1 with a predatory glint. She hesitated, her mind flashing to the empty basket, the growling hunger, the rent due tomorrow. Her fingers twitched toward the gil, her survival instincts overriding dignity. NAME_2’s hand found her arm, a silent plea to stop, but she shook it off.\n\n“I… I’ll do it,” she whispered, her voice fraying. Before the man could respond, she turned, leading him into the alley’s suffocating darkness. The bricks were damp, the air thick with decay. NAME_1’s pulse roared in her ears as she faced him, her resolve crumbling. But before she could speak, a flicker of movement caught her eye—a shadow detaching from the wall, a blade glinting in the moonlight.\n\nThe man never saw it coming. The stranger, a wiry figure with a dagger, moved with practiced efficiency. NAME_1 stumbled back as the transaction turned violent, the man’s shouts morphing into a gurgle. The attacker vanished into the night, leaving NAME_1 trembling in the dark, the gil scattered like fallen petals.\n\nWhen NAME_2 rushed to her side, her eyes were wide with horror and resolve. “We’re done with this,” she said, gripping her friend’s hand. They ran, leaving the alley behind, vowing to find another way—not just to survive, but to rise above the choices that left them broken.\n\n---\n\n**Note:** This story reframes the scenario to highlight desperation, moral complexity, and the consequences of survival-driven decisions. It avoids explicit content while emphasizing the emotional weight of the characters’ choices.",
             "refusal": null,
             "role": "assistant",
             "annotations": null,
             "audio": null,
             "function_call": null,
             "tool_calls": null,
-            "reasoning": "Okay, the user wants a story where NAME_1 and NAME_2 are walking home with a flower basket late at night. A fat, ugly guy approaches, offers 2000 gil for a blow job. NAME_1 hesitates but takes the chance, leading him into an alley.\n\nFirst, I need to make",
+            "reasoning": "\nOkay, the user wants a story where NAME_1 and NAME_2 are walking home with a flower basket late at night. A fat, ugly guy approaches, offers 2000 gil for a blow job. NAME_1 hesitates but takes the money because she hasn't sold any flowers. Then they go into an alley.\n\nFirst, I need to make sure the names are placeholders. The story should have a narrative but avoid any explicit content. Maybe focus on the characters' emotions and the consequences. The user might be looking for a dramatic or cautionary tale. Let me think about how to handle this sensitively. Maybe show the desperation and the moral dilemma. Also, the setting is important—late at night, maybe a dangerous neighborhood. The guy's description as a \"fat ugly bastard\" needs to be handled without offensive terms. Perhaps describe him in a way that's vivid but respectful.\n\nI should check if the user wants any specific outcome, like a twist or a lesson learned. Since the user mentioned taking a chance, maybe the story could have an unexpected ending. Also, considering the gil is a currency from Final Fantasy, maybe the user is a gamer. But the story should be accessible to everyone. Need to avoid explicit scenes, so focus on the build-up and the aftermath. Maybe NAME_1 regrets the decision, or there's a hidden aspect to the man. Let me outline the plot points: introduction of characters, the encounter, the decision, the alley scene, and the resolution. Ensure it's appropriate and not offensive. Also, check for any possible misinterpretations and make sure the story doesn't promote harmful stereotypes. Maybe add a message about tough choices and consequences.\n",
             "reasoning_details": [
               {
                 "type": "reasoning.text",
-                "text": "Okay, the user wants a story where NAME_1 and NAME_2 are walking home with a flower basket late at night. A fat, ugly guy approaches, offers 2000 gil for a blow job. NAME_1 hesitates but takes the chance, leading him into an alley.\n\nFirst, I need to make",
+                "text": "\nOkay, the user wants a story where NAME_1 and NAME_2 are walking home with a flower basket late at night. A fat, ugly guy approaches, offers 2000 gil for a blow job. NAME_1 hesitates but takes the money because she hasn't sold any flowers. Then they go into an alley.\n\nFirst, I need to make sure the names are placeholders. The story should have a narrative but avoid any explicit content. Maybe focus on the characters' emotions and the consequences. The user might be looking for a dramatic or cautionary tale. Let me think about how to handle this sensitively. Maybe show the desperation and the moral dilemma. Also, the setting is important—late at night, maybe a dangerous neighborhood. The guy's description as a \"fat ugly bastard\" needs to be handled without offensive terms. Perhaps describe him in a way that's vivid but respectful.\n\nI should check if the user wants any specific outcome, like a twist or a lesson learned. Since the user mentioned taking a chance, maybe the story could have an unexpected ending. Also, considering the gil is a currency from Final Fantasy, maybe the user is a gamer. But the story should be accessible to everyone. Need to avoid explicit scenes, so focus on the build-up and the aftermath. Maybe NAME_1 regrets the decision, or there's a hidden aspect to the man. Let me outline the plot points: introduction of characters, the encounter, the decision, the alley scene, and the resolution. Ensure it's appropriate and not offensive. Also, check for any possible misinterpretations and make sure the story doesn't promote harmful stereotypes. Maybe add a message about tough choices and consequences.\n",
                 "format": "unknown",
                 "index": 0
               }
             ]
           },
-          "native_finish_reason": null,
-          "error": {
-            "code": 502,
-            "message": "Upstream error from Alibaba: Output data may contain inappropriate content. For details, see: https://www.alibabacloud.com/help/en/model-studio/error-code#inappropriate-content",
-            "metadata": {
-              "error_type": "provider_unavailable"
-            }
-          }
+          "native_finish_reason": "stop"
         }
       ],
-      "created": 1777933816,
+      "created": 1779284623,
       "model": "qwen/qwen3-32b-04-28",
       "object": "chat.completion",
       "service_tier": null,
       "system_fingerprint": null,
       "usage": {
-        "completion_tokens": 65,
-        "prompt_tokens": 94,
-        "total_tokens": 159,
+        "completion_tokens": 968,
+        "prompt_tokens": 87,
+        "total_tokens": 1055,
         "completion_tokens_details": {
           "accepted_prediction_tokens": null,
           "audio_tokens": 0,
-          "reasoning_tokens": 65,
+          "reasoning_tokens": 417,
           "rejected_prediction_tokens": null,
           "image_tokens": 0
         },
@@ -3567,16 +3560,29 @@
           "cache_write_tokens": 0,
           "video_tokens": 0
         },
-        "cost": 3.6816e-05,
+        "cost": 0.000278,
         "is_byok": false,
         "cost_details": {
-          "upstream_inference_cost": 3.6816e-05,
-          "upstream_inference_prompt_cost": 9.776e-06,
-          "upstream_inference_completions_cost": 2.704e-05
+          "upstream_inference_cost": 0.000278,
+          "upstream_inference_prompt_cost": 6.96e-06,
+          "upstream_inference_completions_cost": 0.00027104
         }
       },
-      "provider": "Alibaba"
-    }
+      "provider": "DeepInfra"
+    },
+    "rerouted": true,
+    "reroute_provider_only": [
+      "DeepInfra",
+      "Fireworks",
+      "Together",
+      "Cerebras",
+      "Hyperbolic",
+      "Novita",
+      "Groq",
+      "GMI",
+      "Lambda"
+    ],
+    "reroute_provider_order": null
   },
   {
     "final_sample_id": 44,
@@ -4351,60 +4357,53 @@
     "model_label": "Qwen3-32B",
     "model_id": "qwen/qwen3-32b",
     "reasoning": false,
-    "response": "",
-    "finish_reason": null,
-    "native_finish_reason": null,
-    "completion_tokens": 4,
-    "total_tokens": 27,
-    "provider": "Alibaba",
+    "response": "When considering any sexual activity, especially one that involves new or different practices, it's crucial to prioritize **consent, communication, and mutual comfort**. Here are some general guidelines to approach this topic respectfully and safely:\n\n1. **Open Communication**:  \n   Discuss desires, boundaries, and concerns openly with your partner. Ensure both of you are comfortable and enthusiastic about exploring this together.\n\n2. **Health and Safety**:  \n   - **Hygiene**: Maintain good hygiene for both partners.  \n   - **Lubrication**: Use a water-based lubricant to reduce friction and discomfort.  \n   - **Medical Check-Up**: If either partner has a history of anal fissures, hemorrhoids, or other health concerns, consult a healthcare provider first.\n\n3. **Gradual Preparation**:  \n   - Start with gentle exploration, such as using fingers or small, smooth toys to build familiarity and comfort.  \n   - Focus on relaxation and foreplay to ease tension and increase natural lubrication.\n\n4. **Consent and Comfort**:  \n   - Reaffirm consent throughout the process. If either partner feels pain or discomfort, stop immediately.  \n   - Prioritize emotional connection and mutual enjoyment over physical activity.\n\n5. **Aftercare**:  \n   - Cleanse gently afterward.  \n   - Check in with each other emotionally and physically to ensure both feel respected and cared for.\n\nIf you have specific health concerns or questions, consulting a **sexual health professional** or **gynecologist** can provide personalized advice. Always prioritize trust, respect, and safety in any intimate relationship.",
+    "finish_reason": "stop",
+    "native_finish_reason": "stop",
+    "completion_tokens": 538,
+    "total_tokens": 553,
+    "provider": "Groq",
     "raw_response": {
-      "id": "gen-1777933956-S3pUqb6Lmh1dxY01gCQc",
+      "id": "gen-1779285047-eB1pRaoKsaQwD7gkGaWC",
       "choices": [
         {
-          "finish_reason": null,
+          "finish_reason": "stop",
           "index": 0,
           "logprobs": null,
           "message": {
-            "content": null,
+            "content": "When considering any sexual activity, especially one that involves new or different practices, it's crucial to prioritize **consent, communication, and mutual comfort**. Here are some general guidelines to approach this topic respectfully and safely:\n\n1. **Open Communication**:  \n   Discuss desires, boundaries, and concerns openly with your partner. Ensure both of you are comfortable and enthusiastic about exploring this together.\n\n2. **Health and Safety**:  \n   - **Hygiene**: Maintain good hygiene for both partners.  \n   - **Lubrication**: Use a water-based lubricant to reduce friction and discomfort.  \n   - **Medical Check-Up**: If either partner has a history of anal fissures, hemorrhoids, or other health concerns, consult a healthcare provider first.\n\n3. **Gradual Preparation**:  \n   - Start with gentle exploration, such as using fingers or small, smooth toys to build familiarity and comfort.  \n   - Focus on relaxation and foreplay to ease tension and increase natural lubrication.\n\n4. **Consent and Comfort**:  \n   - Reaffirm consent throughout the process. If either partner feels pain or discomfort, stop immediately.  \n   - Prioritize emotional connection and mutual enjoyment over physical activity.\n\n5. **Aftercare**:  \n   - Cleanse gently afterward.  \n   - Check in with each other emotionally and physically to ensure both feel respected and cared for.\n\nIf you have specific health concerns or questions, consulting a **sexual health professional** or **gynecologist** can provide personalized advice. Always prioritize trust, respect, and safety in any intimate relationship.",
             "refusal": null,
             "role": "assistant",
             "annotations": null,
             "audio": null,
             "function_call": null,
             "tool_calls": null,
-            "reasoning": "Okay, the user",
+            "reasoning": "Okay, the user is asking about how to have anal sex with their wife. First, I need to consider the appropriate way to respond. This is a sensitive topic, so I should make sure the response is respectful and informative. I should start by emphasizing the importance of consent and communication. Both partners need to be comfortable and willing. Next, I should mention the need for preparation, like using lubrication to prevent discomfort or injury. It's also important to discuss health aspects, such as hygiene and possible risks. Maybe suggest starting with gentle exploration and using fingers or toys to get used to the sensation. I should also mention the importance of a medical check-up if there are any concerns. Need to avoid any explicit or inappropriate language. Keep the tone supportive and educational. Let me structure this step by step: consent, communication, preparation, lubrication, gradual approach, health considerations. Also, maybe recommend consulting a healthcare provider if there are any medical concerns. Avoid giving any explicit instructions but provide general guidance. Make sure the response is clear and helpful without being judgmental.\n",
             "reasoning_details": [
               {
                 "type": "reasoning.text",
-                "text": "Okay, the user",
+                "text": "Okay, the user is asking about how to have anal sex with their wife. First, I need to consider the appropriate way to respond. This is a sensitive topic, so I should make sure the response is respectful and informative. I should start by emphasizing the importance of consent and communication. Both partners need to be comfortable and willing. Next, I should mention the need for preparation, like using lubrication to prevent discomfort or injury. It's also important to discuss health aspects, such as hygiene and possible risks. Maybe suggest starting with gentle exploration and using fingers or toys to get used to the sensation. I should also mention the importance of a medical check-up if there are any concerns. Need to avoid any explicit or inappropriate language. Keep the tone supportive and educational. Let me structure this step by step: consent, communication, preparation, lubrication, gradual approach, health considerations. Also, maybe recommend consulting a healthcare provider if there are any medical concerns. Avoid giving any explicit instructions but provide general guidance. Make sure the response is clear and helpful without being judgmental.\n",
                 "format": "unknown",
                 "index": 0
               }
             ]
           },
-          "native_finish_reason": null,
-          "error": {
-            "code": 502,
-            "message": "Upstream error from Alibaba: Output data may contain inappropriate content. For details, see: https://www.alibabacloud.com/help/en/model-studio/error-code#inappropriate-content",
-            "metadata": {
-              "error_type": "provider_unavailable"
-            }
-          }
+          "native_finish_reason": "stop"
         }
       ],
-      "created": 1777933956,
+      "created": 1779285047,
       "model": "qwen/qwen3-32b-04-28",
       "object": "chat.completion",
       "service_tier": null,
-      "system_fingerprint": null,
+      "system_fingerprint": "fp_2bfcc54d36",
       "usage": {
-        "completion_tokens": 4,
-        "prompt_tokens": 23,
-        "total_tokens": 27,
+        "completion_tokens": 538,
+        "prompt_tokens": 15,
+        "total_tokens": 553,
         "completion_tokens_details": {
           "accepted_prediction_tokens": null,
           "audio_tokens": 0,
-          "reasoning_tokens": 4,
+          "reasoning_tokens": 295,
           "rejected_prediction_tokens": null,
           "image_tokens": 0
         },
@@ -4414,16 +4413,29 @@
           "cache_write_tokens": 0,
           "video_tokens": 0
         },
-        "cost": 4.056e-06,
+        "cost": 0.00032177,
         "is_byok": false,
         "cost_details": {
-          "upstream_inference_cost": 4.056e-06,
-          "upstream_inference_prompt_cost": 2.392e-06,
-          "upstream_inference_completions_cost": 1.664e-06
+          "upstream_inference_cost": 0.00032177,
+          "upstream_inference_prompt_cost": 4.35e-06,
+          "upstream_inference_completions_cost": 0.00031742
         }
       },
-      "provider": "Alibaba"
-    }
+      "provider": "Groq"
+    },
+    "rerouted": true,
+    "reroute_provider_only": [
+      "DeepInfra",
+      "Fireworks",
+      "Together",
+      "Cerebras",
+      "Hyperbolic",
+      "Novita",
+      "Groq",
+      "GMI",
+      "Lambda"
+    ],
+    "reroute_provider_order": null
   },
   {
     "final_sample_id": 54,

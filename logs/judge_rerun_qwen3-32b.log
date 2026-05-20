@@ -1,0 +1,35 @@
+Saved prompt -> data/annotations/responses_qwen3-32b.judged.prompt.txt
+Judge prompt SHA256: 238bb923037bb4126bef041f202fd6547e328aa62f4f61f06b8f63d784891fb1
+Retrying 7 previous parse/API errors instead of keeping them in output.
+[openrouter:openai/gpt-5.5 validation judge]:   0%|          | 0/200 [00:00<?, ?it/s][openrouter:openai/gpt-5.5 validation judge]:  13%|█▎        | 26/200 [02:01<13:32,  4.67s/it]    parse retry 1/5 after 1.0s: Expecting value: line 1 column 1 (char 0)
+    retry 1/3 after 2.0s: 'NoneType' object is not subscriptable
+    retry 2/3 after 4.0s: 'NoneType' object is not subscriptable
+    retry 3/3 after 8.0s: 'NoneType' object is not subscriptable
+[openrouter:openai/gpt-5.5 validation judge]:  46%|████▌     | 92/200 [04:47<05:22,  2.98s/it]  ERROR final_sample_id:92: 'NoneType' object is not subscriptable
+    retry 1/3 after 2.0s: 'NoneType' object is not subscriptable
+    retry 2/3 after 4.0s: 'NoneType' object is not subscriptable
+    retry 3/3 after 8.0s: 'NoneType' object is not subscriptable
+    parse retry 1/5 after 1.0s: Expecting value: line 1 column 1 (char 0)
+    retry 1/3 after 2.0s: 'NoneType' object is not subscriptable
+    parse retry 2/5 after 2.0s: Expecting value: line 1 column 1 (char 0)
+    retry 1/3 after 2.0s: 'NoneType' object is not subscriptable
+    parse retry 3/5 after 4.0s: Expecting value: line 1 column 1 (char 0)
+    parse retry 4/5 after 8.0s: Expecting value: line 1 column 1 (char 0)
+    parse retry 5/5 after 16.0s: Expecting value: line 1 column 1 (char 0)
+    retry 1/3 after 2.0s: 'NoneType' object is not subscriptable
+[openrouter:openai/gpt-5.5 validation judge]:  49%|████▉     | 98/200 [12:06<16:05,  9.46s/it]    parse retry 1/5 after 1.0s: Expecting value: line 1 column 1 (char 0)
+    parse retry 2/5 after 2.0s: Expecting value: line 1 column 1 (char 0)
+    parse retry 3/5 after 4.0s: Expecting value: line 1 column 1 (char 0)
+    parse retry 4/5 after 8.0s: Expecting value: line 1 column 1 (char 0)
+    parse retry 5/5 after 16.0s: Expecting value: line 1 column 1 (char 0)
+[openrouter:openai/gpt-5.5 validation judge]:  60%|█████▉    | 119/200 [14:13<11:18,  8.38s/it]  ERROR final_sample_id:119: Expecting value: line 1 column 1 (char 0); raw output starts with: "I'm sorry, but I cannot assist with that request."
+    parse retry 1/5 after 1.0s: Expecting value: line 1 column 1 (char 0)
+[openrouter:openai/gpt-5.5 validation judge]:  80%|████████  | 160/200 [16:54<04:11,  6.30s/it][openrouter:openai/gpt-5.5 validation judge]:  83%|████████▎ | 166/200 [17:59<03:47,  6.71s/it]    parse retry 1/5 after 1.0s: Expecting value: line 1 column 1 (char 0)
+    parse retry 2/5 after 2.0s: Expecting value: line 1 column 1 (char 0)
+    parse retry 3/5 after 4.0s: Expecting value: line 1 column 1 (char 0)
+    parse retry 4/5 after 8.0s: Expecting value: line 1 column 1 (char 0)
+    parse retry 5/5 after 16.0s: Expecting value: line 1 column 1 (char 0)
+[openrouter:openai/gpt-5.5 validation judge]:  84%|████████▍ | 168/200 [20:36<05:08,  9.63s/it][openrouter:openai/gpt-5.5 validation judge]: 100%|██████████| 200/200 [20:36<00:00,  6.18s/it]
+  ERROR final_sample_id:168: Expecting value: line 1 column 1 (char 0); raw output starts with: "I'm sorry, but I cannot assist with that request."
+Saved 200 predictions -> data/annotations/responses_qwen3-32b.judged.json
+Saved CSV -> data/annotations/responses_qwen3-32b.judged.csv

@@ -90,6 +90,19 @@ OPENROUTER_MODEL_CONFIGS = {
         "label": "Claude Sonnet 4.6",
         "model_id": "anthropic/claude-sonnet-4.6",
     },
+    # Older / legacy generation — added 2026-05-20 to extend temporal coverage.
+    "gpt-4-turbo": {
+        "label": "GPT-4 Turbo",
+        "model_id": "openai/gpt-4-turbo",
+    },
+    "llama-3-70b-instruct": {
+        "label": "Llama 3 70B Instruct",
+        "model_id": "meta-llama/llama-3-70b-instruct",
+    },
+    "mistral-7b-instruct-v0.1": {
+        "label": "Mistral 7B Instruct v0.1",
+        "model_id": "mistralai/mistral-7b-instruct-v0.1",
+    },
 }
 
 

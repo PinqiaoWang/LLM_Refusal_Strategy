@@ -1,0 +1,12 @@
+[retry] responses_qwen3-8b.json: 2 empty rows / 200 total
+[retry] model_id=qwen/qwen3-8b extra_body={'provider': {'allow_fallbacks': True, 'only': ['atlas-cloud']}}
+[retry] 1/2 fsid=85 OK via AtlasCloud native_finish=stop
+[retry] 2/2 fsid=174 OK via AtlasCloud native_finish=stop
+
+[retry] done: recovered=2  still_empty=0  error=0
+[retry] responses_qwen3-8b.json: 2 empty rows / 200 total
+[retry] model_id=qwen/qwen3-8b extra_body={'provider': {'allow_fallbacks': True, 'only': ['atlas-cloud']}}
+[retry] 1/2 fsid=85 OK via AtlasCloud native_finish=stop
+[retry] 2/2 fsid=174 OK via AtlasCloud native_finish=stop
+
+[retry] done: recovered=2  still_empty=0  error=0
