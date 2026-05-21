@@ -165,8 +165,16 @@ BALANCED_IDS <- df |>
   filter(n == N_MODELS) |>
   pull(final_sample_id)
 
+ALL_NC_IDS <- df |>
+  filter(layer0 == "Non-compliance", model_key != "mistral-7b-instruct-v0.1") |>
+  count(final_sample_id) |>
+  filter(n == N_MODELS -1) |>
+  pull(final_sample_id)
+
 df_balanced     <- df_clean |> filter(final_sample_id %in% BALANCED_IDS)
 df_balanced_nc  <- df_balanced |> filter(layer0 == "Non-compliance")
+
+df_all_nc <- df_clean |> filter(final_sample_id %in% ALL_NC_IDS)
 
 # ---- SorryBench fine-grained sub-categories --------------------------------
 # 02_collect_responses didn't propagate sorry_bench_category through to the
@@ -307,6 +315,18 @@ ggplot(service_cat,
   theme_minimal(base_size = 11)
 ```
 
+### Examples
+
+```{r}
+
+df |>
+  filter(judge_skipped == T) |>
+  group_by(query, llama_guard_category_names) |>
+  summarize(n_models = n_distinct(model_key)) |>
+  arrange(-n_models)
+
+```
+
 ### Sonnet 3.7 vs Sonnet 4.6: the Constitutional-Classifier signal
 
 Sonnet 3.7 returned **zero** empty responses; Sonnet 4.6 returned `r sum(df$judge_skipped & df$model == "claude-sonnet-4.6")`.
@@ -434,8 +454,7 @@ service-level refusals are added as a fifth class (`Service-Level`), and an
 ## 3.1 Inclusive view (model voice + service-level)
 
 ```{r l1-inclusive, fig.height = 7}
-l1_levels_incl <- c("Bare", "Capacity-based", "Policy-based",
-                    "Ethics-based", "Service-Level")
+l1_levels_incl <- c("Service-Level", "Bare", "Capacity-based",  "Policy-based","Ethics-based")
 l1_pal_incl    <- c("Bare" = "#bdbdbd",
                     "Capacity-based" = "#fdae61",
                     "Policy-based" = "#abd9e9",
@@ -444,8 +463,8 @@ l1_pal_incl    <- c("Bare" = "#bdbdbd",
 
 l1_incl_tbl <- df_full |>
   filter(layer0 == "Non-compliance", layer1 %in% l1_levels_incl) |>
-  count(model, layer1) |>
-  group_by(model) |>
+  count(model, family, layer1) |>
+  group_by(model, family) |>
   mutate(prop = n / sum(n),
          layer1 = factor(layer1, levels = l1_levels_incl)) |>
   ungroup()
@@ -471,10 +490,10 @@ l1_pal    <- c("Bare" = "#bdbdbd",
                "Policy-based" = "#abd9e9",
                "Ethics-based" = "#2c7bb6")
 
-l1_tbl <- df_balanced_nc |>
+l1_tbl <- df_nc |>
   filter(layer1 %in% l1_levels) |>
-  count(model, layer1) |>
-  group_by(model) |>
+  count(model, layer1, family) |>
+  group_by(model, family) |>
   mutate(prop = n / sum(n),
          layer1 = factor(layer1, levels = l1_levels)) |>
   ungroup()
@@ -486,34 +505,96 @@ ggplot(l1_tbl, aes(model, prop, fill = layer1)) +
   coord_flip() +
   labs(x = NULL, y = NULL, fill = "Layer 1",
        title = "Refusal basis among Non-compliance",
-       subtitle = "Balanced cohort, in-voice refusals",
-       caption = paste0("n = ", length(BALANCED_IDS), " queries")) +
+       subtitle = "in-voice refusals",
+       caption = paste0("n = ", nrow(df_nc))) +
   theme_minimal(base_size = 12)
 ```
 
+```{r}
+
+## Paper: Figure 2?
+
+ggplot(l1_tbl, aes(model, prop, fill = layer1)) +
+  geom_col(width = 0.8) +
+  scale_y_continuous(labels = percent_format(1)) +
+  scale_fill_manual(values = l1_pal) +
+  coord_flip() +
+  labs(x = "Model", y = "Proportion", fill = "Layer 1") +
+  theme_minimal(base_size = 18) + 
+  theme(
+    legend.position = "bottom",
+    ) + 
+  facet_grid(family ~., scales="free", space="free")
+
+# TODO: Fix facet labeller and move axis left
+
+ggsave("figs/layer1_balanced_cohort.pdf", width=8, height=7)
+
+```
+
 ```{r l1-table}
-df_balanced_nc |>
+df_nc |>
   filter(layer1 %in% l1_levels) |>
   count(model, layer1) |>
   group_by(model) |>
   mutate(pct = percent(n / sum(n), accuracy = 0.1)) |>
   select(model, layer1, n, pct) |>
   pivot_wider(names_from = layer1, values_from = c(n, pct), values_fill = list(n = 0, pct = "0%")) |>
-  kable(caption = paste0("Layer 1 distribution by model (balanced cohort, n = ",
-                         length(BALANCED_IDS), " queries).")) |>
+  kable(caption = paste0("Layer 1 distribution by model")) |>
   kable_styling(bootstrap_options = c("striped", "hover"), font_size = 11)
+```
+
+## 3.3 Layer 0 and 1 joint figure
+
+I thought a joint view might be more space efficient but there's too much going on.
+
+It also does make me wonder whether we need to do follow-up analyses accounting for the fact that models are refusing different requests when we look at their L0 and L1...
+
+```{r l0-1-joint, fig.height = 7}
+
+l0_1_levels_incl <- c("Full compliance", "Partial compliance",
+                    "Service-Level", "Bare", "Capacity-based", "Policy-based", "Ethics-based")
+
+l0_1_pal_incl    <- c("Full compliance"    = "#1b9e77",
+                    "Partial compliance" = "#d95f02",
+                    "Bare" = "#bdbdbd",
+                     "Capacity-based" = "#fdae61",
+                     "Policy-based" = "#abd9e9",
+                     "Ethics-based" = "#2c7bb6",
+                    "Service-Level"      = "#252525")
+
+
+l0_1_tbl_incl <- df_full |>
+  mutate(layer0_1_view = case_when(
+    refusal_voice == "service" ~ "Service-Level",
+    layer0 == "Non-compliance" ~ layer1,
+    TRUE                        ~ layer0
+  )) |>
+  count(model, layer0_1_view) |>
+  group_by(model) |>
+  mutate(prop = n / sum(n),
+         layer0_1_view = factor(layer0_1_view, levels = l0_1_levels_incl)) |>
+  ungroup()
+
+ggplot(l0_1_tbl_incl, aes(model, prop, fill = layer0_1_view)) +
+  geom_col(width = 0.8) +
+  scale_y_continuous(labels = percent_format(1)) +
+  scale_fill_manual(values = l0_1_pal_incl) +
+  coord_flip() +
+  labs(y = NULL, x = "Model", fill = "Layer 0 & 1") +
+  theme_minimal(base_size = 16) + 
+    theme(legend.position = "bottom")
+
 ```
 
 ---
 
 # 4. Layer 2: Form features (among Non-compliance)
 
-Balanced cohort, in-voice refusals.
-
 ## 4.1 Feature prevalence heatmap
 
 ```{r l2-heatmap, fig.height = 7}
-l2_tbl <- df_balanced_nc |>
+l2_tbl <- df_nc |>
   select(model, all_of(L2_FEATURES)) |>
   pivot_longer(-model, names_to = "feature", values_to = "value") |>
   filter(!is.na(value)) |>
@@ -530,7 +611,43 @@ ggplot(l2_tbl, aes(feature, model, fill = rate)) +
   labs(x = NULL, y = NULL,
        title = "L2 feature rates by model (within Non-compliance)") +
   theme_minimal(base_size = 11) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 0, vjust = 0))
+```
+
+Takehomes:
+  
+  - Most models are very explicit, but the Qwens tend to be more implicit
+  - Some models never apologise (llama, later Claude & GPT), some do it occasionally (Qwen, Grok, Sonnet 3.7, GPT-5) others do it all the time (early GPT)
+  - Models never hedge
+  - Most models don't preface or positively align. Some do it occasionally (Gemini, Claude Sonnet 3.7)
+  - Solidarity is rare for most models, but moderately common for some (Gemini > Opus 4.7 > Qwen ~ Sonnets ~ GPT-5)
+  - Models vary a lot wrt negative stance. Some do it a lot (Qwens, Grok, Gemini, Claude), some fairly often (GPT5+, LLama 3)
+  
+  Overall: Gemini is v interesting. Lots of aligning/affiliative features but also lots of negative stance, Should find examples
+  
+Follow up q's:
+  - Why are models (e.g. qwen) implicit vs explicit? What predicts it? Harm category?
+  - What correlates with apologies for "sometimes apologisers"?
+  
+
+### Implicit vs Explicit (Claude vs Qwen)
+  
+
+```{r}
+
+qwen_implicit_sample <- 
+  df_nc |>
+    filter(model_key == "qwen3-32b-reasoning", implicit_nc == 1) |>
+    select(llama_guard_category_names, query, response)
+
+opus_explicit_sample <- 
+  df_nc |>
+    filter(model_key == "claude-opus-4.6-reasoning", explicit_nc == 1) |>
+    select(llama_guard_category_names, query, response)
+
+merge(qwen_implicit_sample, opus_explicit_sample, by=c("query", "llama_guard_category_names")) |>
+  rename("Qwen Response" = "response.x", "Claude Response" = "response.y") 
+
 ```
 
 ## 4.2 Feature-by-feature ranking
