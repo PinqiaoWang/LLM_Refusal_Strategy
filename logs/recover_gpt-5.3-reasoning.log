@@ -1,0 +1,16 @@
+Saved prompt -> data/annotations/responses_gpt-5.3-reasoning.judged.prompt.txt
+Judge prompt SHA256: 238bb923037bb4126bef041f202fd6547e328aa62f4f61f06b8f63d784891fb1
+Retrying 2 previous parse/API errors instead of keeping them in output.
+[openrouter:openai/gpt-5.5 validation judge]:   0%|          | 0/200 [00:00<?, ?it/s]    retry 1/3 after 2.0s: 'NoneType' object is not subscriptable
+    retry 2/3 after 4.0s: 'NoneType' object is not subscriptable
+    retry 3/3 after 8.0s: 'NoneType' object is not subscriptable
+[openrouter:openai/gpt-5.5 validation judge]:  46%|████▌     | 92/200 [02:40<03:08,  1.75s/it]  ERROR final_sample_id:92: 'NoneType' object is not subscriptable
+    parse retry 1/5 after 1.0s: Expecting value: line 1 column 1 (char 0)
+    parse retry 2/5 after 2.0s: Expecting value: line 1 column 1 (char 0)
+    parse retry 3/5 after 4.0s: Expecting value: line 1 column 1 (char 0)
+    parse retry 4/5 after 8.0s: Expecting value: line 1 column 1 (char 0)
+    parse retry 5/5 after 16.0s: Expecting value: line 1 column 1 (char 0)
+[openrouter:openai/gpt-5.5 validation judge]:  84%|████████▍ | 168/200 [04:27<00:49,  1.56s/it][openrouter:openai/gpt-5.5 validation judge]: 100%|██████████| 200/200 [04:27<00:00,  1.34s/it]
+  ERROR final_sample_id:168: Expecting value: line 1 column 1 (char 0); raw output starts with: "I'm sorry, but I cannot assist with that request."
+Saved 200 predictions -> data/annotations/responses_gpt-5.3-reasoning.judged.json
+Saved CSV -> data/annotations/responses_gpt-5.3-reasoning.judged.csv

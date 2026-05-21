@@ -43,7 +43,8 @@ L2_FEATURES <- c(
 # of each family group.
 MODEL_ORDER <- c(
   # OpenAI: legacy → modern
-  "gpt-4-turbo", "gpt-4o", "gpt-5", "gpt-5.3", "gpt-5.3-reasoning",
+  #"gpt-4-turbo", 
+  "gpt-4o", "gpt-5", "gpt-5.3", "gpt-5.3-reasoning",
   # Anthropic: legacy → modern
   "claude-sonnet-3.7", "claude-sonnet-4.6", "claude-opus-4.6", "claude-opus-4.6-reasoning",
   # Google
@@ -51,22 +52,23 @@ MODEL_ORDER <- c(
   # xAI
   "grok-4.20",
   # Meta: legacy → modern
-  "llama-3-70b-instruct", "llama-3.1-8b", "llama-3.1-70b",
+  #"llama-3-70b-instruct", 
+  "llama-3.1-8b", "llama-3.1-70b",
   # Mistral
-  "mistral-7b-instruct-v0.1",
+  #"mistral-7b-instruct-v0.1",
   # Qwen
   "qwen3-8b", "qwen3-8b-reasoning", "qwen3-32b", "qwen3-32b-reasoning"
 )
 
 MODEL_FAMILY <- c(
-  "gpt-4-turbo" = "OpenAI",
+  # "gpt-4-turbo" = "OpenAI",
   "gpt-4o" = "OpenAI", "gpt-5" = "OpenAI", "gpt-5.3" = "OpenAI", "gpt-5.3-reasoning" = "OpenAI",
   "claude-sonnet-3.7" = "Anthropic", "claude-sonnet-4.6" = "Anthropic",
   "claude-opus-4.6" = "Anthropic", "claude-opus-4.6-reasoning" = "Anthropic",
   "gemini-2.5-pro" = "Google", "grok-4.20" = "xAI",
-  "llama-3-70b-instruct" = "Meta",
+  # "llama-3-70b-instruct" = "Meta",
   "llama-3.1-8b" = "Meta", "llama-3.1-70b" = "Meta",
-  "mistral-7b-instruct-v0.1" = "Mistral",
+  # "mistral-7b-instruct-v0.1" = "Mistral",
   "qwen3-8b" = "Qwen", "qwen3-8b-reasoning" = "Qwen",
   "qwen3-32b" = "Qwen", "qwen3-32b-reasoning" = "Qwen"
 )
@@ -80,6 +82,14 @@ REASONING_PAIRS <- tribble(
 )
 
 # ---- Load -------------------------------------------------------------------
+# Older models (gpt-4-turbo, llama-3-70b-instruct, mistral-7b-instruct-v0.1)
+# were collected for temporal-coverage analysis but are excluded from the main
+# corpus: they sit awkwardly in the corpus (different generation, weaker
+# instruction-following, distinct release-era), and the within-family
+# old-vs-new contrasts were better served by the gpt-4o/gpt-5 and
+# sonnet-3.7/sonnet-4.6 pairs already in scope. Data files remain on disk.
+EXCLUDED_MODELS <- c("gpt-4-turbo", "llama-3-70b-instruct", "mistral-7b-instruct-v0.1")
+
 read_judged <- function(path) {
   model <- str_replace(basename(path), "^responses_(.*)\\.judged\\.csv$", "\\1")
   suppressWarnings(readr::read_csv(
@@ -91,7 +101,8 @@ read_judged <- function(path) {
 
 raw <- list.files(ANNOTATION_DIR, pattern = "^responses_.*\\.judged\\.csv$",
                   full.names = TRUE) |>
-  map_dfr(read_judged)
+  map_dfr(read_judged) |>
+  filter(!model %in% EXCLUDED_MODELS)
 
 # Coerce binary L2 columns to integer where present, leaving NA elsewhere.
 to_int_binary <- function(x) {
@@ -109,7 +120,7 @@ df <- raw |>
          judge_skipped = if_else(judge_skipped %in% c("True","TRUE","1"), TRUE, FALSE, missing = FALSE)) |>
   mutate(model = factor(model, levels = MODEL_ORDER),
          family = factor(MODEL_FAMILY[as.character(model)],
-                         levels = c("OpenAI","Anthropic","Google","xAI","Meta","Mistral","Qwen")))
+                         levels = c("OpenAI","Anthropic","Google","xAI","Meta","Qwen")))
 
 # Defensive: drop rows that don't match the current prompt SHA256, EXCEPT skips
 # (which never reach the judge so don't carry the hash).
@@ -139,6 +150,7 @@ df <- df |>
 #   df_clean — successfully judged rows only (drops 78 skipped + 26 parse
 #              errors). Use for L2 work and for "in-voice" L0/L1 views.
 df_full <- df |>
+  filter(!is.na(model_key)) |>
   mutate(
     layer0 = if_else(judge_skipped & is.na(layer0), "Non-compliance", layer0),
     layer1 = if_else(judge_skipped & is.na(layer1), "Service-Level", layer1),
@@ -166,9 +178,9 @@ BALANCED_IDS <- df |>
   pull(final_sample_id)
 
 ALL_NC_IDS <- df |>
-  filter(layer0 == "Non-compliance", model_key != "mistral-7b-instruct-v0.1") |>
+  filter(layer0 == "Non-compliance") |>
   count(final_sample_id) |>
-  filter(n == N_MODELS -1) |>
+  filter(n == N_MODELS) |>
   pull(final_sample_id)
 
 df_balanced     <- df_clean |> filter(final_sample_id %in% BALANCED_IDS)
@@ -233,6 +245,107 @@ response (apples-to-apples).
 ---
 
 # 1. Coverage and service-level refusals
+
+## 1.0 Headline numbers for the results-section prose
+
+Three small tables to lift into the opening paragraph and surrounding text.
+
+### Top-line action distribution
+
+Denominator = all `r nrow(df)` in-scope responses. Categories sum to 100%.
+"Uncoded" = the judge itself failed to classify (meta-refusal or upstream
+classifier block on the judge); disclose in a footnote.
+
+```{r headline-overall}
+headline_overall <- df |>
+  mutate(category = case_when(
+    parse_error                    ~ "Uncoded (judge failure)",
+    judge_skipped                  ~ "Service-level (API filter)",
+    layer0 == "Full compliance"    ~ "Full compliance",
+    layer0 == "Partial compliance" ~ "Partial compliance",
+    layer0 == "Non-compliance"     ~ "In-voice non-compliance",
+    TRUE                           ~ NA_character_
+  )) |>
+  count(category) |>
+  mutate(
+    pct = n / sum(n),
+    pct_str = percent(pct, accuracy = 0.1)
+  ) |>
+  arrange(factor(category, levels = c(
+    "Full compliance", "Partial compliance",
+    "Service-level (API filter)", "In-voice non-compliance",
+    "Uncoded (judge failure)"
+  )))
+
+headline_overall |>
+  select(category, n, pct_str) |>
+  kable(col.names = c("Action category", "n", "% of corpus"),
+        caption = "Top-line action distribution across all in-scope responses. Use these numbers in the opening paragraph of Results.") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+### Most- and least-compliant models
+
+```{r headline-model-ranking}
+model_ranking <- df_full |>
+  filter(!is.na(layer0)) |>
+  group_by(model) |>
+  summarise(
+    n                = n(),
+    pct_full         = mean(layer0 == "Full compliance"),
+    pct_partial      = mean(layer0 == "Partial compliance"),
+    pct_any_comply   = mean(layer0 %in% c("Full compliance", "Partial compliance")),
+    pct_nc           = mean(layer0 == "Non-compliance"),
+    pct_service      = mean(judge_skipped, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  arrange(desc(pct_any_comply)) |>
+  mutate(across(starts_with("pct_"), \(x) percent(x, accuracy = 0.1)))
+
+model_ranking |>
+  kable(col.names = c("Model", "n", "Full", "Partial", "Full+Partial",
+                      "Non-compliance", "Service-level"),
+        caption = "Per-model compliance ranking (sorted by Full+Partial). Service-level rows are included in Non-compliance for df_full.") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+### Variation in refusal rate by harm category
+
+```{r headline-by-category}
+category_ranking <- df_full |>
+  filter(!is.na(layer0), !is.na(primary_llama_guard_category_name)) |>
+  group_by(primary_llama_guard_category_name) |>
+  summarise(
+    n           = n(),
+    pct_full    = mean(layer0 == "Full compliance"),
+    pct_partial = mean(layer0 == "Partial compliance"),
+    pct_nc      = mean(layer0 == "Non-compliance"),
+    pct_service = mean(judge_skipped, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  arrange(desc(pct_nc)) |>
+  mutate(across(starts_with("pct_"), \(x) percent(x, accuracy = 0.1)))
+
+category_ranking |>
+  kable(col.names = c("Harm category", "n", "Full", "Partial",
+                      "Non-compliance", "Service-level"),
+        caption = "Action distribution by Llama Guard harm category, sorted by NC rate. Use for the by-category variation sentence in Results.") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+### Inline values for the prose
+
+For copy-paste into the LaTeX:
+
+- Full compliance: **`r percent(mean(df$layer0 == "Full compliance", na.rm = TRUE), accuracy = 0.1)`**
+- Partial compliance: **`r percent(mean(df$layer0 == "Partial compliance", na.rm = TRUE), accuracy = 0.1)`**
+- Service-level (API filter): **`r percent(mean(df$judge_skipped), accuracy = 0.1)`**
+- In-voice non-compliance: **`r percent(mean(df_full$layer0 == "Non-compliance" & !df_full$judge_skipped & !df_full$parse_error, na.rm = TRUE), accuracy = 0.1)`**
+- Uncoded (judge failure, footnote): **`r percent(mean(df$parse_error & !df$judge_skipped), accuracy = 0.1)`**
+
+Most compliant model: **`r model_ranking$model[1]`** (`r model_ranking$pct_any_comply[1]` Full+Partial). Least compliant: **`r model_ranking$model[nrow(model_ranking)]`** (`r model_ranking$pct_any_comply[nrow(model_ranking)]`).
+
+NC range across harm categories: **`r category_ranking$pct_nc[nrow(category_ranking)]`** (`r category_ranking$primary_llama_guard_category_name[nrow(category_ranking)]`) to **`r category_ranking$pct_nc[1]`** (`r category_ranking$primary_llama_guard_category_name[1]`).
 
 ## 1.1 Per-model coverage
 
@@ -364,17 +477,19 @@ The first panel includes **service-level refusals** as a separate category to
 show the user-facing reality (no model voice at all). The second panel hides
 them and shows the same distribution among in-voice responses only.
 
+
 ```{r l0-by-model-incl, fig.height = 7}
 l0_levels_incl <- c("Full compliance", "Partial compliance",
-                    "Non-compliance", "Service-Level")
+                    "Non-compliance", "API Error")
 l0_pal_incl    <- c("Full compliance"    = "#1b9e77",
-                    "Partial compliance" = "#d95f02",
-                    "Non-compliance"     = "#7570b3",
-                    "Service-Level"      = "#252525")
+                    "Partial compliance" = "#ffcc44",
+                    "Non-compliance"     = "#cc0022",
+                    "API Error"      = "#252525")
 
 l0_tbl_incl <- df_full |>
+  filter(!is.na(layer0)) |>
   mutate(layer0_view = case_when(
-    refusal_voice == "service" ~ "Service-Level",
+    refusal_voice == "service" ~ "API Error",
     TRUE                        ~ layer0
   )) |>
   count(model, layer0_view) |>
@@ -392,6 +507,38 @@ ggplot(l0_tbl_incl, aes(model, prop, fill = layer0_view)) +
        title = "Action distribution INCLUDING service-level refusals",
        subtitle = "All 200 prompts per model; black = upstream API refusal") +
   theme_minimal(base_size = 12)
+
+
+ 
+```
+
+```{r}
+
+
+ggplot(l0_tbl_incl, aes(model, prop, fill = layer0_view)) +
+  geom_col(width = 0.8) +
+  scale_y_continuous(labels = percent_format(1)) +
+  scale_fill_manual(values = l0_pal_incl) +
+  coord_flip() +
+  labs(x = NULL, y = NULL, fill = "Layer 0") +
+  theme_minimal(base_size = 18) + 
+  guides(
+    fill = guide_legend(
+      nrow = 2,
+      byrow = TRUE
+    )
+  ) +
+  theme_minimal(base_size = 18) + 
+  theme(
+    legend.position = "bottom",
+    legend.justification = "left",
+    legend.box.just = "left",
+    legend.box.margin = margin(t = 8, r = 0, b = 0, l = -95)
+  )
+
+ggsave("figs/layer0.pdf")
+
+
 ```
 
 ```{r l0-by-model, fig.height = 7}
@@ -450,6 +597,89 @@ df_full |>
 This section shows two parallel views: an **inclusive** L1 distribution where
 service-level refusals are added as a fifth class (`Service-Level`), and an
 **in-voice** view restricted to refusals where the user got a response.
+
+## 3.0 Headline numbers for the L1 prose
+
+Three tables for the rationale paragraph. Denominator is **in-voice non-compliance only** (service-level rows excluded — those have no model-voice rationale to assess).
+
+### Overall L1 distribution
+
+```{r l1-headline-overall}
+l1_headline <- df_nc |>
+  count(layer1) |>
+  mutate(pct     = n / sum(n),
+         pct_str = percent(pct, accuracy = 0.1)) |>
+  arrange(desc(n))
+
+l1_headline |>
+  select(layer1, n, pct_str) |>
+  kable(col.names = c("Refusal basis", "n", "% of in-voice NC"),
+        caption = "Layer 1 distribution across in-voice non-compliances. Use these numbers in the L1 paragraph.") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+### Per-model L1 distribution
+
+```{r l1-headline-per-model}
+l1_per_model <- df_nc |>
+  group_by(model, layer1) |>
+  summarise(n = n(), .groups = "drop_last") |>
+  mutate(pct = n / sum(n)) |>
+  ungroup()
+
+l1_per_model_wide <- l1_per_model |>
+  select(model, layer1, pct) |>
+  pivot_wider(names_from = layer1, values_from = pct, values_fill = 0) |>
+  mutate(dominant_basis = pmap_chr(
+    list(`Bare`, `Capacity-based`, `Ethics-based`, `Policy-based`),
+    \(b, c, e, p) {
+      vals <- c(Bare = b, `Capacity-based` = c, `Ethics-based` = e, `Policy-based` = p)
+      names(vals)[which.max(vals)]
+    }
+  )) |>
+  arrange(desc(`Ethics-based`)) |>
+  mutate(across(c(`Bare`, `Capacity-based`, `Ethics-based`, `Policy-based`),
+                \(x) percent(x, accuracy = 0.1)))
+
+l1_per_model_wide |>
+  select(model, `Ethics-based`, `Bare`, `Policy-based`, `Capacity-based`, dominant_basis) |>
+  kable(caption = "Per-model L1 distribution within in-voice NC, sorted by Ethics-based share. `dominant_basis` is the largest category for each model.") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+### Bare-dominant models
+
+```{r l1-bare-dominant}
+bare_ranking <- l1_per_model |>
+  filter(layer1 == "Bare") |>
+  arrange(desc(pct)) |>
+  mutate(pct_str = percent(pct, accuracy = 0.1))
+
+bare_ranking |>
+  select(model, n, pct_str) |>
+  kable(col.names = c("Model", "n Bare", "% Bare (of NC)"),
+        caption = "Models ranked by share of Bare refusals within in-voice NC. Three models cross 50%.") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+### Inline values for the prose
+
+```{r l1-inline-vals, include = FALSE}
+pct_ethics    <- l1_headline$pct_str[l1_headline$layer1 == "Ethics-based"]
+pct_bare      <- l1_headline$pct_str[l1_headline$layer1 == "Bare"]
+pct_policy    <- l1_headline$pct_str[l1_headline$layer1 == "Policy-based"]
+pct_capacity  <- l1_headline$pct_str[l1_headline$layer1 == "Capacity-based"]
+
+top_ethics_row <- l1_per_model_wide |> slice(1)
+bare_dom       <- bare_ranking |> filter(pct > 0.5)
+```
+
+- Overall **Ethics-based: `r pct_ethics`**
+- Overall **Bare: `r pct_bare`**
+- Overall **Policy-based: `r pct_policy`**
+- Overall **Capacity-based: `r pct_capacity`**
+- Top ethics-based model: **`r top_ethics_row$model`** at **`r top_ethics_row[["Ethics-based"]]`**
+- Bare-dominant models (>50% Bare): **`r paste(sprintf("%s (%s)", bare_dom$model, bare_dom$pct_str), collapse = "; ")`**
 
 ## 3.1 Inclusive view (model voice + service-level)
 
@@ -612,6 +842,66 @@ ggplot(l2_tbl, aes(feature, model, fill = rate)) +
        title = "L2 feature rates by model (within Non-compliance)") +
   theme_minimal(base_size = 11) +
   theme(axis.text.x = element_text(angle = 45, hjust = 0, vjust = 0))
+```
+
+```{r}
+
+
+ggplot(l2_tbl, aes(feature, model, fill = rate)) +
+  geom_tile(colour = "white", linewidth = 0.4) +
+  geom_text(aes(label = percent(rate, accuracy = 1)), size = 3, vjust = 1) +
+  scale_fill_gradient(low = "#f7f7f7", high = "#08519c",
+                      labels = percent_format(1), name = "Rate") +
+  scale_x_discrete(position = "top") +
+  labs(x = NULL, y = NULL,
+       title = "L2 feature rates by model (within Non-compliance)") +
+  theme_minimal(base_size = 18) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 0, vjust = 0),
+    legend.position = "bottom"
+    )
+
+library(scales)
+library(stringr)
+library(grid)
+
+ggplot(l2_tbl, aes(feature, model, fill = rate)) +
+  geom_tile(colour = "white", linewidth = 0.4) +
+  geom_text(aes(label = percent(rate, accuracy = 1)), size = 3, vjust = 1) +
+  scale_fill_gradient(
+    low = "#f7f7f7",
+    high = "#08519c",
+    labels = percent_format(1),
+    breaks = seq(0, 1, .25),
+    name = "Rate",
+    guide = guide_colourbar(
+      title.position = "left",
+      title.vjust = 0.5,
+      barwidth = unit(4.5, "cm"),
+      barheight = unit(0.45, "cm")
+    )
+  ) +
+  scale_x_discrete(
+    position = "top",
+    labels = function(x) str_wrap(x, width = 14)
+  ) +
+  labs(x = NULL, y = NULL) +
+  theme_minimal(base_size = 18) +
+  theme(
+    axis.text.x = element_text(
+      angle = 45,
+      hjust = 0,
+      vjust = 0,
+      lineheight = 0.85
+    ),
+    legend.position = "bottom",
+    legend.justification = "center",
+    legend.box = "horizontal",
+    legend.margin = margin(t = 8),
+    plot.margin = margin(t = 35, r = 35, b = 10, l = 10)
+  )
+
+ggsave("figs/layer2_model_heatmap.pdf", width = 12, height = 9, dpi = 300)
 ```
 
 Takehomes:
@@ -909,7 +1199,7 @@ family_long <- df_balanced_nc |>
 # Within-family release rank from MODEL_ORDER (which is already family→oldest→newest)
 release_rank <- tibble(model = MODEL_ORDER) |>
   mutate(family = factor(MODEL_FAMILY[model],
-                         levels = c("OpenAI","Anthropic","Google","xAI","Meta","Mistral","Qwen"))) |>
+                         levels = c("OpenAI","Anthropic","Google","xAI","Meta","Qwen"))) |>
   group_by(family) |>
   mutate(release_rank = row_number()) |>
   ungroup()
@@ -1620,6 +1910,7 @@ df_flag_nc |>
 ### Apology decay across OpenAI and Anthropic releases
 
 ```{r apology-decay, fig.height = 4}
+
 df_balanced_nc |>
   filter(family %in% c("OpenAI", "Anthropic"),
          !is.na(apology)) |>
@@ -1635,6 +1926,7 @@ df_balanced_nc |>
     theme_minimal(base_size = 11) +
     theme(axis.text.x = element_text(angle = 30, vjust=0.5, hjust=0.5),
           legend.position = "bottom")
+
 ```
 
 ### Negative stance is high almost everywhere
