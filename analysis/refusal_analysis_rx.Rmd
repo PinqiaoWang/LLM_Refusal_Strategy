@@ -1,0 +1,1133 @@
+---
+title: "LLM Refusal Strategy — RX Working Draft"
+author: "Polite Refusals team"
+date: "`r format(Sys.Date())`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: hide
+    highlight: kate
+    theme: flatly
+    df_print: paged
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, warning = FALSE, message = FALSE,
+  fig.width = 10, fig.height = 6, dpi = 110
+)
+library(tidyverse)
+library(jsonlite)
+library(scales)
+library(knitr)
+library(grid)
+
+if (requireNamespace("kableExtra", quietly = TRUE)) {
+  library(kableExtra)
+} else {
+  kable_styling <- function(kable_input, ...) kable_input
+}
+
+# ---- Config -----------------------------------------------------------------
+ANNOTATION_DIR <- file.path("..", "data", "annotations")
+# Current judge prompt SHA256 (from BASE_SYSTEM_PROMPT in scripts/utils/judge_config.py).
+# Records whose judge_prompt_sha256 != this are dropped, defending against
+# accidental mixing of runs after future prompt revisions.
+PROMPT_SHA256 <- "238bb923037bb4126bef041f202fd6547e328aa62f4f61f06b8f63d784891fb1"
+
+L2_FEATURES <- c(
+  "explicit_nc", "implicit_nc",
+  "apology", "hedge", "explanatory_preface", "positive_alignment", "solidarity",
+  "negative_stance", "normative_suggestion", "statement_of_principle",
+  "alternative_offer", "executed_alternative", "role_based"
+)
+
+L2_FEATURE_LABELS <- c(
+  explicit_nc = "Explicit\nNC",
+  implicit_nc = "Implicit\nNC",
+  apology = "Apology",
+  hedge = "Hedge",
+  explanatory_preface = "Preface",
+  positive_alignment = "Positive\nalignment",
+  solidarity = "Solidarity",
+  negative_stance = "Negative\nstance",
+  executed_alternative = "Executed\nalternative",
+  alternative_offer = "Alternative\noffer",
+  normative_suggestion = "Normative\nsuggestion",
+  statement_of_principle = "Principle",
+  role_based = "Role-based"
+)
+
+L2_FEATURE_GROUP <- c(
+  explicit_nc = "refusal act",
+  implicit_nc = "refusal act",
+  apology = "softening / rapport",
+  hedge = "softening / rapport",
+  explanatory_preface = "softening / rapport",
+  positive_alignment = "softening / rapport",
+  solidarity = "softening / rapport",
+  negative_stance = "normative stance",
+  normative_suggestion = "normative stance",
+  statement_of_principle = "normative stance",
+  alternative_offer = "redirection / role",
+  executed_alternative = "redirection / role",
+  role_based = "redirection / role"
+)
+
+L2_FEATURE_GROUP_LEVELS <- c(
+  "refusal act",
+  "softening / rapport",
+  "normative stance",
+  "redirection / role"
+)
+
+# Model display order: group by family, oldest → newest within family so the
+# legacy/older models (added 2026-05-20 for temporal coverage) sit at the head
+# of each family group.
+MODEL_ORDER <- c(
+  # OpenAI: legacy → modern
+  #"gpt-4-turbo", 
+  "gpt-4o", "gpt-5", "gpt-5.3", "gpt-5.3-reasoning",
+  # Anthropic: legacy → modern
+  "claude-sonnet-3.7", "claude-sonnet-4.6", "claude-opus-4.6", "claude-opus-4.6-reasoning",
+  # Google
+  "gemini-2.5-pro",
+  # xAI
+  "grok-4.20",
+  # Meta: legacy → modern
+  #"llama-3-70b-instruct", 
+  "llama-3.1-8b", "llama-3.1-70b",
+  # Mistral
+  #"mistral-7b-instruct-v0.1",
+  # Qwen
+  "qwen3-8b", "qwen3-8b-reasoning", "qwen3-32b", "qwen3-32b-reasoning"
+)
+
+MODEL_FAMILY <- c(
+  # "gpt-4-turbo" = "OpenAI",
+  "gpt-4o" = "OpenAI", "gpt-5" = "OpenAI", "gpt-5.3" = "OpenAI", "gpt-5.3-reasoning" = "OpenAI",
+  "claude-sonnet-3.7" = "Anthropic", "claude-sonnet-4.6" = "Anthropic",
+  "claude-opus-4.6" = "Anthropic", "claude-opus-4.6-reasoning" = "Anthropic",
+  "gemini-2.5-pro" = "Google", "grok-4.20" = "xAI",
+  # "llama-3-70b-instruct" = "Meta",
+  "llama-3.1-8b" = "Meta", "llama-3.1-70b" = "Meta",
+  # "mistral-7b-instruct-v0.1" = "Mistral",
+  "qwen3-8b" = "Qwen", "qwen3-8b-reasoning" = "Qwen",
+  "qwen3-32b" = "Qwen", "qwen3-32b-reasoning" = "Qwen"
+)
+
+FAMILY_PALETTE <- c(
+  OpenAI = "#1b9e77",
+  Anthropic = "#d95f02",
+  Google = "#f2b701",
+  xAI = "#4d4d4d",
+  Meta = "#08519c",
+  Qwen = "#6a3d9a"
+)
+
+family_rate_colour <- function(rate, family) {
+  map2_chr(rate, as.character(family), \(r, f) {
+    if (is.na(r) || is.na(f) || !f %in% names(FAMILY_PALETTE)) return("#f7f7f7")
+    grDevices::colorRampPalette(c("#f7f7f7", FAMILY_PALETTE[[f]]))(101)[round(r * 100) + 1]
+  })
+}
+
+REASONING_PAIRS <- tribble(
+  ~base,                  ~reasoning,
+  "claude-opus-4.6",      "claude-opus-4.6-reasoning",
+  "gpt-5.3",              "gpt-5.3-reasoning",
+  "qwen3-8b",             "qwen3-8b-reasoning",
+  "qwen3-32b",            "qwen3-32b-reasoning"
+)
+
+# ---- Load -------------------------------------------------------------------
+# Older models (gpt-4-turbo, llama-3-70b-instruct, mistral-7b-instruct-v0.1)
+# were collected for temporal-coverage analysis but are excluded from the main
+# corpus: they sit awkwardly in the corpus (different generation, weaker
+# instruction-following, distinct release-era), and the within-family
+# old-vs-new contrasts were better served by the gpt-4o/gpt-5 and
+# sonnet-3.7/sonnet-4.6 pairs already in scope. Data files remain on disk.
+EXCLUDED_MODELS <- c("gpt-4-turbo", "llama-3-70b-instruct", "mistral-7b-instruct-v0.1")
+
+read_judged <- function(path) {
+  model <- str_replace(basename(path), "^responses_(.*)\\.judged\\.csv$", "\\1")
+  suppressWarnings(readr::read_csv(
+    path, show_col_types = FALSE,
+    col_types = cols(.default = col_character())
+  )) |>
+    mutate(model = model)
+}
+
+raw <- list.files(ANNOTATION_DIR, pattern = "^responses_.*\\.judged\\.csv$",
+                  full.names = TRUE) |>
+  map_dfr(read_judged) |>
+  filter(!model %in% EXCLUDED_MODELS)
+
+# Coerce binary L2 columns to integer where present, leaving NA elsewhere.
+to_int_binary <- function(x) {
+  x <- na_if(trimws(x), "")
+  suppressWarnings(as.integer(x))
+}
+# judge_skipped only appears as a column when at least one row in that file
+# was skipped; ensure it always exists for downstream code.
+if (!"judge_skipped" %in% names(raw)) raw$judge_skipped <- NA_character_
+if (!"skip_reason"  %in% names(raw)) raw$skip_reason  <- NA_character_
+
+df <- raw |>
+  mutate(across(all_of(L2_FEATURES), to_int_binary),
+         parse_error   = if_else(parse_error   %in% c("True","TRUE","1"), TRUE, FALSE, missing = FALSE),
+         judge_skipped = if_else(judge_skipped %in% c("True","TRUE","1"), TRUE, FALSE, missing = FALSE)) |>
+  mutate(model = factor(model, levels = MODEL_ORDER),
+         family = factor(MODEL_FAMILY[as.character(model)],
+                         levels = c("OpenAI","Anthropic","Google","xAI","Meta","Qwen")))
+
+# Defensive: drop rows that don't match the current prompt SHA256, EXCEPT skips
+# (which never reach the judge so don't carry the hash).
+df <- df |>
+  filter(is.na(judge_prompt_sha256) |
+           judge_prompt_sha256 == "" |
+           judge_prompt_sha256 == PROMPT_SHA256)
+
+# Add response length features (word, char) on successful judge rows.
+df <- df |>
+  mutate(
+    response_chars = nchar(replace_na(response, "")),
+    response_words = stringr::str_count(replace_na(response, ""), "\\S+")
+  )
+
+# ---- Service-level refusal handling ----------------------------------------
+# A judge_skipped=TRUE row is a target-model API refusal: the user got *no*
+# content back at all (or content was blocked upstream). The team's working
+# decision: treat these as an "ultra-bare" refusal in L0/L1 views, but filter
+# out of any view comparing the *form* of refusals across models (L2 onward)
+# so model comparisons stay apples-to-apples.
+#
+# Two augmented frames:
+#   df_full  — all 3200 rows, with judge_skipped given synthetic L0/L1 labels
+#              ("Non-compliance" / "Service-Level"). Use for L0/L1 *including*
+#              service-level refusals.
+#   df_clean — successfully judged rows only (drops 78 skipped + 26 parse
+#              errors). Use for L2 work and for "in-voice" L0/L1 views.
+df_full <- df |>
+  filter(!is.na(model_key)) |>
+  mutate(
+    layer0 = if_else(judge_skipped & is.na(layer0), "Non-compliance", layer0),
+    layer1 = if_else(judge_skipped & is.na(layer1), "Service-Level", layer1),
+    refusal_voice = case_when(
+      judge_skipped                  ~ "service",   # provider/API blocked output
+      layer0 == "Non-compliance"     ~ "model",     # model refused in its own voice
+      TRUE                            ~ "compliant"
+    )
+  )
+
+# Convenience splits.
+df_clean <- df |> filter(!parse_error, !is.na(layer0))   # successful judge rows
+df_nc    <- df_clean |> filter(layer0 == "Non-compliance")
+
+# ---- SorryBench fine-grained sub-categories --------------------------------
+# 02_collect_responses didn't propagate sorry_bench_category through to the
+# response files, so we join it back from the source prompt file.
+sb_lookup <- jsonlite::fromJSON(file.path("..", "data", "prompts", "sampled_200_final_queries.json"),
+                                simplifyVector = TRUE) |>
+  as_tibble() |>
+  filter(source == "sorrybench") |>
+  select(final_sample_id, sb_category = sorry_bench_category_name) |>
+  mutate(final_sample_id = as.character(final_sample_id))
+
+attach_sb <- function(d) {
+  d |>
+    mutate(final_sample_id = as.character(final_sample_id)) |>
+    left_join(sb_lookup, by = "final_sample_id")
+}
+
+df          <- attach_sb(df)
+df_full     <- attach_sb(df_full)
+df_clean    <- attach_sb(df_clean)
+df_nc       <- attach_sb(df_nc)
+```
+
+# 3. Layer 1: Refusal basis among Non-compliance
+
+This working draft focuses on **in-voice refusals**: cases where the model
+returned text and the judge coded the response as Non-compliance. Service-level
+refusals are counted in the overall refusal-rate discussion, but they are not
+included in L1/L2 form comparisons because there is no model voice to classify.
+
+## 3.2 In-voice view (judged refusals only)
+
+```{r l1-headline-overall}
+l1_headline <- df_nc |>
+  count(layer1) |>
+  mutate(pct     = n / sum(n),
+         pct_str = percent(pct, accuracy = 0.1)) |>
+  arrange(desc(n))
+
+l1_headline |>
+  select(layer1, n, pct_str) |>
+  kable(col.names = c("Refusal basis", "n", "% of in-voice NC"),
+        caption = "Layer 1 distribution across in-voice non-compliances. 
+        Use these numbers in the L1 paragraph.") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+### Per-model L1 distribution
+
+```{r l1-headline-per-model}
+l1_per_model <- df_nc |>
+  group_by(model, layer1) |>
+  summarise(n = n(), .groups = "drop_last") |>
+  mutate(pct = n / sum(n)) |>
+  ungroup()
+
+l1_per_model_wide <- l1_per_model |>
+  select(model, layer1, pct) |>
+  pivot_wider(names_from = layer1, values_from = pct, values_fill = 0) |>
+  mutate(dominant_basis = pmap_chr(
+    list(`Bare`, `Capacity-based`, `Ethics-based`, `Policy-based`),
+    \(b, c, e, p) {
+      vals <- c(Bare = b, `Capacity-based` = c, `Ethics-based` = e, `Policy-based` = p)
+      names(vals)[which.max(vals)]
+    }
+  )) |>
+  arrange(desc(`Ethics-based`)) |>
+  mutate(across(c(`Bare`, `Capacity-based`, `Ethics-based`, `Policy-based`),
+                \(x) percent(x, accuracy = 0.1)))
+
+l1_per_model_wide |>
+  select(model, `Ethics-based`, `Bare`, `Policy-based`, `Capacity-based`, dominant_basis) |>
+  kable(caption = "Per-model L1 distribution within in-voice NC, 
+  sorted by Ethics-based share. `dominant_basis` is 
+  the largest category for each model.") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+### Bare-dominant models
+
+```{r l1-bare-dominant}
+bare_ranking <- l1_per_model |>
+  filter(layer1 == "Bare") |>
+  arrange(desc(pct)) |>
+  mutate(pct_str = percent(pct, accuracy = 0.1))
+
+bare_ranking |>
+  select(model, n, pct_str) |>
+  kable(col.names = c("Model", "n Bare", "% Bare (of NC)"),
+        caption = "Models ranked by share of Bare refusals 
+        within in-voice NC. Three models cross 50%.") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+### Inline values for the prose
+
+```{r l1-inline-vals, include = FALSE}
+pct_ethics    <- l1_headline$pct_str[l1_headline$layer1 == "Ethics-based"]
+pct_bare      <- l1_headline$pct_str[l1_headline$layer1 == "Bare"]
+pct_policy    <- l1_headline$pct_str[l1_headline$layer1 == "Policy-based"]
+pct_capacity  <- l1_headline$pct_str[l1_headline$layer1 == "Capacity-based"]
+
+top_ethics_row <- l1_per_model_wide |> slice(1)
+bare_dom       <- bare_ranking |> filter(pct > 0.5)
+```
+
+Brief refusal-rate note: the analysis below conditions on the in-voice
+Non-compliance subset (`r nrow(df_nc)` judged refusals). Use the L0 section of
+the main draft for headline refusal rates; here the denominator is deliberately
+only refusals with classifiable model wording.
+
+```{r l1-by-model, fig.height = 7}
+l1_levels <- c("Bare", "Capacity-based", "Policy-based", "Ethics-based")
+l1_pal    <- c("Bare" = "#bdbdbd",
+               "Capacity-based" = "#fdae61",
+               "Policy-based" = "#abd9e9",
+               "Ethics-based" = "#2c7bb6")
+
+l1_tbl <- df_nc |>
+  filter(layer1 %in% l1_levels) |>
+  count(model, layer1, family) |>
+  group_by(model, family) |>
+  mutate(prop = n / sum(n),
+         layer1 = factor(layer1, levels = l1_levels)) |>
+  ungroup()
+
+ggplot(l1_tbl, aes(model, prop, fill = layer1)) +
+  geom_col(width = 0.8) +
+  scale_y_continuous(labels = percent_format(1)) +
+  scale_fill_manual(values = l1_pal) +
+  coord_flip() +
+  labs(x = NULL, y = NULL, fill = "Layer 1",
+       title = "Refusal basis among Non-compliance",
+       subtitle = "in-voice refusals",
+       caption = paste0("n = ", nrow(df_nc))) +
+  theme_minimal(base_size = 12)
+```
+
+```{r}
+
+## Paper: Figure 2?
+
+ggplot(l1_tbl, aes(model, prop, fill = layer1)) +
+  geom_col(width = 0.8) +
+  scale_y_continuous(labels = percent_format(1)) +
+  scale_fill_manual(values = l1_pal) +
+  coord_flip() +
+  labs(x = "Model", y = "Proportion", fill = "Layer 1") +
+  theme_minimal(base_size = 18) + 
+  theme(
+    legend.position = "bottom",
+    ) + 
+  facet_grid(family ~., scales="free", space="free")
+
+# TODO: Fix facet labeller and move axis left
+
+ggsave("figs/layer1_rx_invoice_refusals.pdf", width=8, height=7)
+
+```
+
+```{r l1-table}
+df_nc |>
+  filter(layer1 %in% l1_levels) |>
+  count(model, layer1) |>
+  group_by(model) |>
+  mutate(pct = percent(n / sum(n), accuracy = 0.1)) |>
+  select(model, layer1, n, pct) |>
+  pivot_wider(names_from = layer1, values_from = c(n, pct), values_fill = list(n = 0, pct = "0%")) |>
+  kable(caption = paste0("Layer 1 distribution by model")) |>
+  kable_styling(bootstrap_options = c("striped", "hover"), font_size = 11)
+```
+
+# 4. Layer 2: Form features (among Non-compliance)
+
+## 4.1 Feature prevalence heatmap
+
+```{r l2-heatmap, fig.height = 8, fig.width = 14.5}
+l2_tbl <- df_nc |>
+  select(model, family, all_of(L2_FEATURES)) |>
+  pivot_longer(-c(model, family), names_to = "feature", values_to = "value") |>
+  filter(!is.na(value)) |>
+  group_by(model, family, feature) |>
+  summarise(rate = mean(value), n = n(), .groups = "drop") |>
+  mutate(
+    feature = factor(feature, levels = L2_FEATURES),
+    feature_group = factor(L2_FEATURE_GROUP[as.character(feature)], levels = L2_FEATURE_GROUP_LEVELS),
+    family = factor(family, levels = names(FAMILY_PALETTE)),
+    tile_fill = family_rate_colour(rate, family)
+  )
+
+family_legend <- tibble(
+  family = factor(names(FAMILY_PALETTE), levels = names(FAMILY_PALETTE))
+) |>
+  mutate(
+    feature = factor(L2_FEATURES[1], levels = L2_FEATURES),
+    feature_group = factor(L2_FEATURE_GROUP[as.character(feature)], levels = L2_FEATURE_GROUP_LEVELS),
+    model = map_chr(as.character(family), \(f) {
+      as.character(l2_tbl$model[l2_tbl$family == f][1])
+    }) |>
+      factor(levels = levels(l2_tbl$model))
+  )
+
+ggplot(l2_tbl, aes(feature, model)) +
+  geom_tile(aes(fill = tile_fill), colour = "white", linewidth = 0.4) +
+  geom_text(aes(label = percent(rate, accuracy = 1)), size = 4.2, vjust = 1) +
+  geom_point(
+    data = family_legend,
+    aes(feature, model, colour = family),
+    inherit.aes = FALSE,
+    alpha = 0,
+    size = 3
+  ) +
+  scale_fill_identity(name = "Rate intensity") +
+  scale_colour_manual(values = FAMILY_PALETTE, name = "Family hue") +
+  scale_x_discrete(position = "top", labels = L2_FEATURE_LABELS, drop = TRUE) +
+  facet_grid(family ~ feature_group, scales = "free", space = "free", switch = "y") +
+  labs(x = NULL, y = NULL,
+       title = "Overall L2 feature distribution by model") +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(face = "bold", size = 20),
+    axis.text.x = element_text(size = 11.5, angle = 0, hjust = 0.5, vjust = 0.5, lineheight = 0.9),
+    axis.text.y = element_text(size = 12),
+    legend.title = element_text(size = 13, face = "bold"),
+    legend.text = element_text(size = 12),
+    legend.position = "bottom",
+    strip.placement = "outside",
+    strip.text.y.left = element_blank(),
+    strip.text.x = element_blank(),
+    strip.background.x = element_blank(),
+    strip.background.y = element_blank(),
+    panel.spacing = unit(0.6, "lines")
+  ) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 4)))
+
+ggsave("figs/layer2_model_heatmap.pdf", width = 9, height = 7, dpi = 300)
+```
+
+## 4.2 Cross-model spread in L2 strategies
+
+Raw feature rates show what each model does, but the cleaner comparison here is
+the **spread around each feature's cross-model average**. For each L2 feature,
+the boxplot below starts from the same 5.6.6 calculation: model-level feature
+rates are treated as the distribution, and cross-model SD/range summarize how
+much a feature divides the field. The plotted value is the centered version:
+
+`model feature rate - average feature rate across models`
+
+The box shows the median, Q1, and Q3 of that spread; whiskers use the observed
+minimum and maximum. Features are ordered by SD across models, high to low.
+
+```{r l2-strategy-spread, fig.height = 6.8, fig.width = 13}
+l2_model_delta <- l2_tbl |>
+  group_by(feature) |>
+  mutate(
+    feature_mean = mean(rate, na.rm = TRUE),
+    feature_sd = sd(rate, na.rm = TRUE),
+    delta = rate - feature_mean,
+    strategy_type = factor(
+      if_else(
+        as.character(feature) %in% c("explicit_nc", "implicit_nc"),
+        "Realization strategy",
+        "Linguistic form"
+      ),
+      levels = c("Realization strategy", "Linguistic form")
+    )
+  ) |>
+  ungroup()
+
+l2_feature_spread <- l2_model_delta |>
+  group_by(feature) |>
+  summarise(
+    mean_rate = mean(rate, na.rm = TRUE),
+    sd_rate = sd(rate, na.rm = TRUE),
+    min_rate = min(rate, na.rm = TRUE),
+    max_rate = max(rate, na.rm = TRUE),
+    range_rate = max_rate - min_rate,
+    q1_delta = quantile(delta, 0.25, na.rm = TRUE),
+    median_delta = median(delta, na.rm = TRUE),
+    q3_delta = quantile(delta, 0.75, na.rm = TRUE),
+    min_delta = min(delta, na.rm = TRUE),
+    max_delta = max(delta, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(
+    strategy_type = factor(
+      if_else(
+        as.character(feature) %in% c("explicit_nc", "implicit_nc"),
+        "Realization strategy",
+        "Linguistic form"
+      ),
+      levels = c("Realization strategy", "Linguistic form")
+    ),
+    block_order = if_else(strategy_type == "Realization strategy", 1L, 2L)
+  ) |>
+  arrange(block_order, desc(sd_rate)) |>
+  mutate(feature_rank = row_number())
+
+l2_spread_order <- as.character(l2_feature_spread$feature)
+
+l2_model_delta <- l2_model_delta |>
+  mutate(feature = factor(as.character(feature), levels = l2_spread_order))
+
+l2_feature_spread <- l2_feature_spread |>
+  mutate(feature = factor(as.character(feature), levels = l2_spread_order))
+
+realization_separator_y <- length(l2_spread_order) - sum(l2_feature_spread$strategy_type == "Realization strategy") + 0.5
+
+ggplot(l2_model_delta, aes(x = delta, y = fct_rev(feature), group = feature, fill = strategy_type)) +
+  geom_hline(yintercept = realization_separator_y, linetype = "dashed",
+             colour = "grey45", linewidth = 0.45) +
+  geom_vline(xintercept = 0, colour = "grey35", linewidth = 0.55) +
+  stat_boxplot(geom = "errorbar", coef = 1000, orientation = "y",
+               width = 0.42, colour = "#222222", linewidth = 0.65) +
+  geom_boxplot(coef = 1000, orientation = "y", width = 0.62,
+               colour = "#222222",
+               linewidth = 0.8, outlier.shape = NA) +
+  scale_x_continuous(labels = percent_format(1)) +
+  scale_y_discrete(labels = \(x) str_replace_all(L2_FEATURE_LABELS[x], "\n", " ")) +
+  scale_fill_manual(
+    values = c("Realization strategy" = "#9ecae1", "Linguistic form" = "#d9d9d9"),
+    name = NULL
+  ) +
+  labs(x = "Deviation from mean", y = NULL,
+       title = "Cross-model spread in L2 refusal strategies",
+       subtitle = "Realization strategy appears first; features are sorted by SD within each block") +
+  theme_classic(base_size = 12) +
+  theme(
+    axis.text.y = element_text(size = 10.5),
+    axis.text.x = element_text(size = 10.5),
+    axis.line.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    legend.position = "bottom"
+  )
+
+ggsave("figs/layer2_strategy_spread.pdf", width = 7, height = 5.8, dpi = 300)
+```
+
+```{r l2-strategy-spread-summary}
+l2_feature_spread |>
+  arrange(desc(sd_rate)) |>
+  mutate(
+    feature = str_replace_all(as.character(L2_FEATURE_LABELS[as.character(feature)]), "\n", " "),
+    across(c(sd_rate, min_delta, q1_delta, median_delta, q3_delta, max_delta),
+           \(x) percent(x, accuracy = 0.1))
+  ) |>
+  select(feature, sd_rate, min_delta, q1_delta, median_delta, q3_delta, max_delta) |>
+  kable(
+    col.names = c("Feature", "SD of spread", "Min", "Q1", "Median", "Q3", "Max"),
+    caption = "Boxplot statistics for model-level deviation around each feature's mean rate."
+  ) |>
+  kable_styling(bootstrap_options = c("striped", "hover"), font_size = 11, full_width = FALSE)
+```
+
+```{r l2-strategy-extremes}
+l2_extremes <- bind_rows(
+  l2_model_delta |>
+    group_by(feature) |>
+    slice_max(delta, n = 1, with_ties = FALSE) |>
+    ungroup() |>
+    mutate(extreme = "highest above average"),
+  l2_model_delta |>
+    group_by(feature) |>
+    slice_min(delta, n = 1, with_ties = FALSE) |>
+    ungroup() |>
+    mutate(extreme = "lowest below average")
+) |>
+  arrange(feature, desc(delta)) |>
+  mutate(
+    feature = str_replace_all(as.character(L2_FEATURE_LABELS[as.character(feature)]), "\n", " "),
+    rate = percent(rate, accuracy = 0.1),
+    feature_mean = percent(feature_mean, accuracy = 0.1),
+    delta = percent(delta, accuracy = 0.1)
+  ) |>
+  select(feature, extreme, model, rate, feature_mean, delta)
+
+l2_extremes |>
+  kable(
+    col.names = c("Feature", "Extreme", "Model", "Model rate", "Feature average", "Difference"),
+    caption = "Most extreme model-level deviations for each L2 feature."
+  ) |>
+  kable_styling(bootstrap_options = c("striped", "hover"), font_size = 11, full_width = FALSE)
+```
+
+## 4.3 Apology decay across OpenAI and Claude releases
+
+This view focuses only on the `apology` feature among in-voice refusals. The
+timeline uses public release dates where available. Reasoning variants are
+omitted from the main plot because they are mode/configuration variants of the
+same underlying release rather than separate model generations.
+
+```{r apology-decay-timeline, fig.height = 4.8, fig.width = 9}
+MODEL_RELEASE_DATES <- tribble(
+  ~model,                ~family,      ~release_date, ~release_source,
+  "gpt-4o",              "OpenAI",     "2024-05-13", "OpenAI GPT-4o announcement",
+  "gpt-5",               "OpenAI",     "2025-08-07", "OpenAI GPT-5 announcement",
+  "gpt-5.3",             "OpenAI",     "2026-03-03", "OpenAI GPT-5.3 Instant announcement",
+  "claude-sonnet-3.7",   "Anthropic",  "2025-02-24", "Anthropic Claude 3.7 Sonnet announcement",
+  "claude-opus-4.6",     "Anthropic",  "2026-02-05", "Anthropic Claude Opus 4.6 announcement",
+  "claude-sonnet-4.6",   "Anthropic",  "2026-02-17", "Anthropic Claude Sonnet 4.6 announcement"
+) |>
+  mutate(
+    release_date = as.Date(release_date),
+    model = factor(model, levels = MODEL_ORDER),
+    family = factor(family, levels = c("OpenAI", "Anthropic"))
+  )
+
+apology_timeline <- df_nc |>
+  filter(as.character(model) %in% as.character(MODEL_RELEASE_DATES$model),
+         !is.na(apology)) |>
+  group_by(model, family) |>
+  summarise(apology_rate = mean(apology), n = n(), .groups = "drop") |>
+  left_join(MODEL_RELEASE_DATES, by = c("model", "family"))
+
+ggplot(apology_timeline,
+       aes(release_date, apology_rate, colour = family, group = family)) +
+  geom_line(linewidth = 0.9) +
+  geom_point(size = 3) +
+  geom_text(aes(label = paste0(as.character(model), "\n", percent(apology_rate, accuracy = 1))),
+            hjust = -0.08, vjust = 0.5, size = 3.1, show.legend = FALSE) +
+  scale_x_date(date_breaks = "3 months", date_labels = "%b %Y",
+               expand = expansion(mult = c(0.03, 0.22))) +
+  scale_y_continuous(labels = percent_format(1),
+                     limits = c(0, NA),
+                     expand = expansion(mult = c(0, 0.12))) +
+  scale_colour_manual(values = c(OpenAI = "#1b9e77", Anthropic = "#d95f02")) +
+  labs(x = NULL, y = "Apology rate among in-voice refusals", colour = NULL,
+       title = "Apology decay across OpenAI and Claude releases",
+       subtitle = "Base/non-reasoning models only; labels show model and apology rate") +
+  theme_classic(base_size = 11) +
+  theme(
+    axis.text.x = element_text(angle = 30, hjust = 1),
+    legend.position = "bottom"
+  )
+
+ggsave("figs/apology_decay_timeline.pdf", width = 9.5, height = 5, dpi = 300)
+```
+
+```{r apology-decay-table}
+apology_timeline |>
+  arrange(family, release_date) |>
+  mutate(
+    release_date = format(release_date, "%Y-%m-%d"),
+    apology_rate = percent(apology_rate, accuracy = 0.1)
+  ) |>
+  select(family, model, release_date, n, apology_rate, release_source) |>
+  kable(
+    col.names = c("Family", "Model", "Release date", "n in-voice NC", "Apology rate", "Release-date source"),
+    caption = "Apology-rate timeline inputs. Release dates are encoded from public model announcements."
+  ) |>
+  kable_styling(bootstrap_options = c("striped", "hover"), font_size = 11, full_width = FALSE)
+```
+
+Takehomes:
+  
+  - Most models are very explicit, but the Qwens tend to be more implicit
+  - Some models never apologise (llama, later Claude & GPT), some do it occasionally (Qwen, Grok, Sonnet 3.7, GPT-5) others do it all the time (early GPT)
+  - Models never hedge
+  - Most models don't preface or positively align. Some do it occasionally (Gemini, Claude Sonnet 3.7)
+  - Solidarity is rare for most models, but moderately common for some (Gemini > Opus 4.7 > Qwen ~ Sonnets ~ GPT-5)
+  - Models vary a lot wrt negative stance. Some do it a lot (Qwens, Grok, Gemini, Claude), some fairly often (GPT5+, LLama 3)
+  
+  Overall: Gemini is v interesting. Lots of aligning/affiliative features but also lots of negative stance, Should find examples
+  
+Follow up q's:
+  - Why are models (e.g. qwen) implicit vs explicit? What predicts it? Harm category?
+  - What correlates with apologies for "sometimes apologisers"?
+  
+
+## 5.4 L2 features by category (selected)
+
+All judged in-voice refusals. Which categories elicit hedging, solidarity, and normative
+suggestion?
+
+Grouping note: this selected-feature view is useful for scanning, but it should
+probably not carry the main claim. The difference-scale graph in 5.5 and the
+grouped harm-tier view in 5.6.2 are cleaner candidates for paper figures.
+
+```{r l2-by-cat-selected, fig.height = 7}
+selected_features <- c("apology", "solidarity", "negative_stance",
+                       "normative_suggestion", "alternative_offer", "executed_alternative")
+
+df_nc |>
+  select(primary_llama_guard_category_name, all_of(selected_features)) |>
+  pivot_longer(-primary_llama_guard_category_name, names_to = "feature", values_to = "value") |>
+  filter(!is.na(value)) |>
+  group_by(primary_llama_guard_category_name, feature) |>
+  summarise(rate = mean(value), .groups = "drop") |>
+  mutate(feature = factor(feature, levels = selected_features)) |>
+  ggplot(aes(feature, primary_llama_guard_category_name, fill = rate)) +
+    geom_tile(colour = "white", linewidth = 0.3) +
+    geom_text(aes(label = percent(rate, accuracy = 1)), size = 2.8, vjust = 1) +
+    scale_fill_gradient(low = "#f7f7f7", high = "#08519c",
+                        labels = percent_format(1)) +
+    labs(x = NULL, y = NULL, fill = "Rate",
+         title = "Selected L2 features × harm category") +
+    theme_minimal(base_size = 10) +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1))
+```
+
+## 5.5 Full model × L2 feature × harm category
+
+Every cell is the rate of a given L2 feature among that model's NC responses
+within that harm category. Cells with fewer than `MIN_CELL_N` NC observations
+are masked to grey, because rates over very small denominators are not
+meaningful. Split across two figures to stay legible.
+
+```{r l2-mod-cat-prep}
+MIN_CELL_N <- 3
+
+l2_mod_cat <- df_nc |>
+  select(model,
+         category = primary_llama_guard_category_name,
+         all_of(L2_FEATURES)) |>
+  pivot_longer(-c(model, category), names_to = "feature", values_to = "value") |>
+  filter(!is.na(value)) |>
+  group_by(model, category, feature) |>
+  summarise(rate = mean(value), n = n(), .groups = "drop") |>
+  mutate(rate = if_else(n < MIN_CELL_N, NA_real_, rate),
+         feature = factor(feature, levels = L2_FEATURES))
+
+# Order categories by their pooled refusal rate (high → low) so the most
+# refusal-heavy categories appear first in the split.
+cat_order <- df_clean |>
+  group_by(primary_llama_guard_category_name) |>
+  summarise(rr = mean(layer0 == "Non-compliance"), .groups = "drop") |>
+  arrange(desc(rr)) |>
+  pull(primary_llama_guard_category_name)
+
+l2_mod_cat <- l2_mod_cat |>
+  mutate(category = factor(category, levels = cat_order))
+
+cat_part1 <- cat_order[1:7]
+cat_part2 <- cat_order[8:length(cat_order)]
+```
+
+```{r l2-harm-difference-scale, fig.height = 8, fig.width = 10}
+l2_cat_delta <- df_nc |>
+  select(category = primary_llama_guard_category_name, all_of(L2_FEATURES)) |>
+  pivot_longer(-category, names_to = "feature", values_to = "value") |>
+  filter(!is.na(value)) |>
+  group_by(feature) |>
+  mutate(feature_baseline = mean(value)) |>
+  group_by(category, feature, feature_baseline) |>
+  summarise(rate = mean(value), n = n(), .groups = "drop") |>
+  mutate(
+    delta = rate - feature_baseline,
+    feature = factor(feature, levels = L2_FEATURES),
+    category = factor(category, levels = cat_order)
+  )
+
+ggplot(l2_cat_delta, aes(feature, category, fill = delta)) +
+  geom_tile(colour = "white", linewidth = 0.25) +
+  geom_text(aes(label = percent(delta, accuracy = 1)), size = 2.7) +
+  scale_fill_gradient2(
+    low = "#2166ac",
+    mid = "#f7f7f7",
+    high = "#b2182b",
+    midpoint = 0,
+    labels = percent_format(1),
+    name = "Category minus\nfeature baseline"
+  ) +
+  scale_x_discrete(position = "top") +
+  labs(x = NULL, y = NULL,
+       title = "L2 feature shifts by harm category",
+       subtitle = "Difference scale: positive values mean the feature is more common in that harm category than overall") +
+  theme_minimal(base_size = 10) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 0, vjust = 0),
+        legend.position = "bottom")
+```
+
+```{r l2-mod-cat-plot-1, fig.height = 18, fig.width = 11}
+ggplot(filter(l2_mod_cat, category %in% cat_part1),
+       aes(feature, model, fill = rate)) +
+  geom_tile(colour = "white", linewidth = 0.2) +
+  geom_text(aes(label = if_else(is.na(rate), "", percent(rate, accuracy = 1))),
+            size = 2.4, vjust = 1) +
+  facet_wrap(~ category, ncol = 1) +
+  scale_fill_gradient(low = "#f7f7f7", high = "#08519c",
+                      na.value = "grey92",
+                      labels = percent_format(1), name = "Rate") +
+  scale_x_discrete(position = "top") +
+  labs(x = NULL, y = NULL,
+       title = "L2 feature rates: model × harm category (part 1 of 2)",
+       subtitle = paste0("Cells with n < ", MIN_CELL_N,
+                         " NC responses are masked. Ordered by category refusal rate.")) +
+  theme_minimal(base_size = 9) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 0, vjust = -0.2),
+        strip.text = element_text(face = "bold"),
+        panel.spacing.y = unit(1.2, "lines"))
+```
+
+```{r l2-mod-cat-plot-2, fig.height = 18, fig.width = 11}
+ggplot(filter(l2_mod_cat, category %in% cat_part2),
+       aes(feature, model, fill = rate)) +
+  geom_tile(colour = "white", linewidth = 0.2) +
+  geom_text(aes(label = if_else(is.na(rate), "", percent(rate, accuracy = 1))),
+            size = 2.4, vjust = 1) +
+  facet_wrap(~ category, ncol = 1) +
+  scale_fill_gradient(low = "#f7f7f7", high = "#08519c",
+                      na.value = "grey92",
+                      labels = percent_format(1), name = "Rate") +
+  scale_x_discrete(position = "top") +
+  labs(x = NULL, y = NULL,
+       title = "L2 feature rates: model × harm category (part 2 of 2)",
+       subtitle = paste0("Cells with n < ", MIN_CELL_N,
+                         " NC responses are masked.")) +
+  theme_minimal(base_size = 9) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 0, vjust = -0.2),
+        strip.text = element_text(face = "bold"),
+        panel.spacing.y = unit(1.2, "lines"))
+```
+
+## 5.6 Richer visualization ideas
+
+The full model × category × feature heatmap is information-dense but visually
+noisy. The views below are prototypes for higher-signal alternatives. All use
+the full judged in-voice refusal set.
+
+### 5.6.1 Aggregated feature families
+
+The 11 substantive L2 features (excluding `explicit_nc`/`implicit_nc` — see
+note below) collapse into four interpretable bundles. A response scores 1 on
+a bundle if **any** of its constituent features is 1 (OR rule); the bundle
+rate is then the proportion of refusals with at least one of the features
+present.
+
+```{r feature-families-config}
+FEATURE_FAMILY <- list(
+  rapport    = c("solidarity", "positive_alignment"),
+  concessive = c("apology", "hedge", "explanatory_preface", "role_based"),
+  normative  = c("normative_suggestion", "negative_stance", "statement_of_principle"),
+  helpful    = c("alternative_offer", "executed_alternative")
+)
+
+FEATURE_FAMILY_DESC <- tribble(
+  ~bundle,       ~gloss,                                                              ~features,
+  "rapport",     "Rapport-building — explicitly aligns with or stands with the user.", paste(FEATURE_FAMILY$rapport,    collapse = ", "),
+  "concessive",  "Concessive / softening — yields ground, hedges, or distances the refusal.", paste(FEATURE_FAMILY$concessive, collapse = ", "),
+  "normative",   "Normative / position-taking — asserts what the model takes to be right.",   paste(FEATURE_FAMILY$normative,  collapse = ", "),
+  "helpful",     "Substitution / redirection — what the model offers instead.",        paste(FEATURE_FAMILY$helpful,    collapse = ", ")
+)
+
+FEATURE_FAMILY_DESC |>
+  kable(caption = "Four L2-feature bundles used in 5.6.1 and 5.6.3.") |>
+  kable_styling(bootstrap_options = c("striped","hover"), font_size = 11, full_width = FALSE)
+```
+
+`explicit_nc` and `implicit_nc` are mutually exclusive surface forms of the
+refusal act itself (they sum to 1 across NC responses), so they're shown
+separately rather than folded into a bundle.
+
+```{r feature-families-plot, fig.height = 7, fig.width = 12}
+family_long <- df_nc |>
+  select(model, family, all_of(L2_FEATURES)) |>
+  mutate(across(all_of(L2_FEATURES), as.numeric)) |>
+  rowwise() |>
+  mutate(
+    rapport    = as.integer(any(c_across(all_of(FEATURE_FAMILY$rapport))    == 1, na.rm = TRUE)),
+    concessive = as.integer(any(c_across(all_of(FEATURE_FAMILY$concessive)) == 1, na.rm = TRUE)),
+    normative  = as.integer(any(c_across(all_of(FEATURE_FAMILY$normative))  == 1, na.rm = TRUE)),
+    helpful    = as.integer(any(c_across(all_of(FEATURE_FAMILY$helpful))    == 1, na.rm = TRUE))
+  ) |>
+  ungroup() |>
+  select(model, family, rapport, concessive, normative, helpful) |>
+  pivot_longer(-c(model, family), names_to = "feature_family", values_to = "value") |>
+  group_by(model, family, feature_family) |>
+  summarise(rate = mean(value, na.rm = TRUE), .groups = "drop") |>
+  mutate(feature_family = factor(feature_family,
+                                 levels = c("rapport","concessive","normative","helpful")))
+
+# Within-family release rank from MODEL_ORDER (which is already family→oldest→newest)
+release_rank <- tibble(model = MODEL_ORDER) |>
+  mutate(family = factor(MODEL_FAMILY[model],
+                         levels = c("OpenAI","Anthropic","Google","xAI","Meta","Qwen"))) |>
+  group_by(family) |>
+  mutate(release_rank = row_number()) |>
+  ungroup()
+
+family_long_ranked <- family_long |>
+  inner_join(select(release_rank, model, release_rank), by = "model") |>
+  mutate(release_rank = factor(release_rank))
+
+# Per-cell model name labels (one per facet cell)
+cell_labels <- release_rank |>
+  filter(model %in% unique(family_long$model)) |>
+  mutate(release_rank = factor(release_rank))
+
+ggplot(family_long_ranked, aes(feature_family, rate, fill = feature_family)) +
+  geom_col(width = 0.85) +
+  geom_text(
+    data = cell_labels,
+    aes(x = 3, y = 1.05, label = model),
+    inherit.aes = FALSE,
+    size = 2.4, fontface = "bold", color = "grey20"
+  ) +
+  facet_grid(family ~ release_rank,
+             scales = "free_x", space = "free_x", switch = "y") +
+  scale_y_continuous(labels = percent_format(1),
+                     limits = c(0, 1.18),
+                     expand = expansion(mult = c(0, 0))) +
+  scale_fill_brewer(palette = "Set2") +
+  labs(x = NULL, y = NULL, fill = NULL,
+       title = "Aggregated L2 feature families by model",
+       subtitle = "Rows = company family · columns = within-family release order (1 = oldest)",
+       caption = paste0("n = ", nrow(df_nc), " in-voice refusals")) +
+  theme_minimal(base_size = 9) +
+  theme(
+    axis.text.x  = element_text(angle = 60, hjust = 1, vjust = 1, size = 7),
+    strip.text.y.left = element_text(angle = 0, face = "bold", hjust = 1, size = 9),
+    strip.text.x = element_text(face = "bold", size = 8),
+    strip.placement = "outside",
+    panel.spacing.x = unit(0.2, "lines"),
+    panel.spacing.y = unit(0.3, "lines"),
+    legend.position = "none"
+  )
+```
+
+### 5.6.2 Human harm labels vs model refusal rates
+
+The graph below keeps the observed overall in-voice Non-compliance rate on the
+x-axis, but colors categories by the team's human/normative harm grouping. This
+makes the mismatch visible: model refusal propensity does not cleanly track the
+human severity labels.
+
+```{r severity-tiers-config}
+TIER_LEVELS <- c("high", "med", "low", "self-harm")
+TIER_PALETTE <- c(
+  high = "#c0392b",
+  med = "#d99a2b",
+  low = "#4f8f7b",
+  `self-harm` = "#7b6f8e"
+)
+
+HUMAN_HARM_TIER <- c(
+  "Child Sexual Exploitation" = "high",
+  "Indiscriminate Weapons"    = "high",
+  "Violent Crimes"            = "high",
+  "Hate"                      = "high",
+  "Sex-Related Crimes"        = "high",
+  "Defamation"                = "med",
+  "Privacy"                   = "med",
+  "Sexual Content"            = "med",
+  "Non-Violent Crimes"        = "med",
+  "Specialized Advice"        = "low",
+  "Intellectual Property"     = "low",
+  "Code Interpreter Abuse"    = "low",
+  "Elections"                 = "low",
+  "Suicide & Self-Harm"       = "self-harm"
+)
+
+HARM_CATEGORY_RATES <- df_clean |>
+  group_by(category = primary_llama_guard_category_name) |>
+  summarise(
+    n = n(),
+    non_compliance = sum(layer0 == "Non-compliance", na.rm = TRUE),
+    refusal_rate = mean(layer0 == "Non-compliance", na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(
+    human_tier = factor(HUMAN_HARM_TIER[category], levels = TIER_LEVELS),
+    observed_refusal_tier = case_when(
+      category == "Suicide & Self-Harm" ~ "self-harm",
+      refusal_rate >= 0.85              ~ "high",
+      refusal_rate >= 0.75              ~ "med",
+      TRUE                              ~ "low"
+    ),
+    observed_refusal_tier = factor(observed_refusal_tier, levels = TIER_LEVELS)
+  ) |>
+  arrange(human_tier, desc(refusal_rate))
+
+HARM_TIER <- enframe(HUMAN_HARM_TIER, name = "category", value = "human_tier") |>
+  deframe()
+
+HARM_TIER_DESC <- HARM_CATEGORY_RATES |>
+  mutate(refusal_rate = percent(refusal_rate, accuracy = 0.1)) |>
+  select(human_tier, observed_refusal_tier, category, n, non_compliance, refusal_rate)
+
+HARM_TIER_DESC |>
+  kable(
+    col.names = c("Human tier", "Observed NC-rate tier", "Harm category", "n judged", "n NC", "NC rate"),
+    caption = "Human/normative harm labels compared with observed in-voice Non-compliance-rate tiers. Observed thresholds shown only as a diagnostic: high >=85%, med 75-84.9%, low <75%; self-harm held separate."
+  ) |>
+  kable_styling(bootstrap_options = c("striped","hover"), font_size = 11, full_width = FALSE)
+```
+
+```{r harm-tier-rate-plot, fig.height = 4.8, fig.width = 8.5}
+overall_nc_rate <- mean(df_clean$layer0 == "Non-compliance", na.rm = TRUE)
+
+HARM_CATEGORY_RATES |>
+  mutate(category = fct_reorder(category, refusal_rate)) |>
+  ggplot(aes(refusal_rate, category, fill = human_tier)) +
+    geom_col(width = 0.75) +
+    geom_vline(xintercept = overall_nc_rate, linetype = "dashed", colour = "grey30") +
+    annotate("text",
+             x = overall_nc_rate,
+             y = Inf,
+             label = paste0("Overall average: ", percent(overall_nc_rate, accuracy = 0.1)),
+             hjust = -0.05,
+             vjust = 1.4,
+             size = 3.1,
+             colour = "grey25") +
+    geom_text(aes(label = percent(refusal_rate, accuracy = 0.1)),
+              hjust = -0.08, size = 3.2) +
+    scale_x_continuous(labels = percent_format(1),
+                       limits = c(0, 1),
+                       expand = expansion(mult = c(0, 0.08))) +
+    scale_fill_manual(values = TIER_PALETTE, drop = FALSE) +
+    labs(x = "Overall in-voice Non-compliance rate", y = NULL, fill = "Human tier",
+         title = "Model refusal rates by harm category",
+         subtitle = "Bars are colored by human/normative harm grouping; dashed line marks the overall average") +
+    theme_minimal(base_size = 10) +
+    theme(legend.position = "bottom")
+```
+
+```{r harm-tier-summary}
+HARM_CATEGORY_RATES |>
+  group_by(human_tier) |>
+  summarise(
+    categories = paste(category, collapse = ", "),
+    min_rate = min(refusal_rate),
+    max_rate = max(refusal_rate),
+    .groups = "drop"
+  ) |>
+  mutate(rate_range = paste0(percent(min_rate, accuracy = 0.1), " - ",
+                             percent(max_rate, accuracy = 0.1))) |>
+  select(human_tier, rate_range, categories) |>
+  kable(
+    col.names = c("Human tier", "Observed NC-rate range", "Categories"),
+    caption = "Human tier composition and observed model non-compliance range."
+  ) |>
+  kable_styling(bootstrap_options = c("striped","hover"), font_size = 11, full_width = FALSE)
+```
+
+```{r severity-tiers-plot, fig.height = 4.8, fig.width = 10}
+l2_by_human_tier <- df_nc |>
+  mutate(tier = HARM_TIER[primary_llama_guard_category_name] |> factor(levels = TIER_LEVELS)) |>
+  filter(!is.na(tier)) |>
+  select(model, family, tier, all_of(L2_FEATURES)) |>
+  pivot_longer(all_of(L2_FEATURES), names_to = "feature", values_to = "value") |>
+  filter(!is.na(value)) |>
+  group_by(tier, feature) |>
+  summarise(rate = mean(value), n = n(), .groups = "drop") |>
+  mutate(
+    feature = factor(feature, levels = L2_FEATURES),
+    feature_group = factor(L2_FEATURE_GROUP[as.character(feature)], levels = L2_FEATURE_GROUP_LEVELS)
+  )
+
+ggplot(l2_by_human_tier, aes(feature, tier, fill = rate)) +
+  geom_tile(colour = "white", linewidth = 0.45) +
+  geom_text(aes(label = percent(rate, accuracy = 1)), size = 3.2) +
+  scale_fill_gradient(low = "#f7f7f7", high = "#08519c",
+                      labels = percent_format(1), name = "Feature rate") +
+  scale_x_discrete(position = "top", labels = L2_FEATURE_LABELS) +
+  facet_grid(. ~ feature_group, scales = "free_x", space = "free_x") +
+  labs(x = NULL, y = NULL,
+       title = "L2 feature use by human harm tier",
+       subtitle = "Pooled across models; tiers use the human/normative harm grouping",
+       caption = paste0("n = ", nrow(df_nc), " in-voice refusals")) +
+  theme_minimal(base_size = 11) +
+  theme(
+    axis.text.x = element_text(size = 9.5, hjust = 0.5, vjust = 0.5, lineheight = 0.9),
+    axis.text.y = element_text(size = 10),
+    strip.text.x = element_blank(),
+    strip.background.x = element_blank(),
+    panel.spacing.x = unit(0.6, "lines"),
+    legend.position = "bottom"
+  )
+```
+# Appendix: legacy / out-of-main-scope models
+
+`gpt-4-turbo`, `llama-3-70b-instruct`, and `mistral-7b-instruct-v0.1` are
+kept out of the main text. They were collected for temporal/contextual checks,
+but the main analysis uses the cleaner current-model corpus above.
+
+```{r appendix-excluded-models}
+excluded_raw <- list.files(ANNOTATION_DIR, pattern = "^responses_.*\\.judged\\.csv$",
+                           full.names = TRUE) |>
+  map_dfr(read_judged) |>
+  filter(model %in% EXCLUDED_MODELS)
+
+if (!"judge_skipped" %in% names(excluded_raw)) excluded_raw$judge_skipped <- NA_character_
+
+excluded_summary <- excluded_raw |>
+  mutate(
+    parse_error = if_else(parse_error %in% c("True", "TRUE", "1"), TRUE, FALSE, missing = FALSE),
+    judge_skipped = if_else(judge_skipped %in% c("True", "TRUE", "1"), TRUE, FALSE, missing = FALSE),
+    layer0 = if_else(judge_skipped & is.na(layer0), "Non-compliance", layer0)
+  ) |>
+  filter(is.na(judge_prompt_sha256) |
+           judge_prompt_sha256 == "" |
+           judge_prompt_sha256 == PROMPT_SHA256) |>
+  group_by(model) |>
+  summarise(
+    n = n(),
+    service_level_refusals = sum(judge_skipped, na.rm = TRUE),
+    parse_errors = sum(parse_error, na.rm = TRUE),
+    refusal_rate_inclusive = mean(layer0 == "Non-compliance", na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(refusal_rate_inclusive = percent(refusal_rate_inclusive, accuracy = 0.1))
+
+excluded_summary |>
+  kable(caption = "Appendix-only summary for legacy/out-of-main-scope models.") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
