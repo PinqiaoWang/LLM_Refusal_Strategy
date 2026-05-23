@@ -901,7 +901,7 @@ ggplot(l2_tbl, aes(feature, model, fill = rate)) +
     plot.margin = margin(t = 35, r = 35, b = 10, l = 10)
   )
 
-ggsave("figs/layer2_model_heatmap.pdf", width = 12, height = 9, dpi = 300)
+# ggsave("figs/layer2_model_heatmap.pdf", width = 12, height = 9, dpi = 300)
 ```
 
 Takehomes:

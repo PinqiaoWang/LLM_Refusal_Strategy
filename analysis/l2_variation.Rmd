@@ -1,0 +1,312 @@
+---
+title: "L2 variation diagnostic — where's the action?"
+date: "`r format(Sys.Date())`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: hide
+    highlight: kate
+    theme: flatly
+---
+
+Standalone diagnostic. Self-contained load — does not touch
+`refusal_analysis.Rmd`. Goal: locate where L2 form features vary most.
+Three lenses:
+
+1. **Across-harm dispersion by model** — does model M use the same L2 forms regardless of harm type, or does it adapt?
+2. **Across-model dispersion by harm** — for harm type H, do models converge on a common refusal form, or diverge?
+3. **Per-feature dispersion** — which of the 13 L2 features carries the most signal across the (model × harm) grid?
+
+Dispersion measure: SD of cell rates across the relevant axis, then averaged
+across L2 features. (For binary features, SD of `p` across cells captures
+between-cell spread; variance and Bernoulli entropy give the same ranking.)
+Cells with `n_nc < MIN_N` are filtered out to keep small-cell noise from
+dominating.
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.width = 10, fig.height = 6, dpi = 110)
+library(tidyverse)
+library(scales)
+library(knitr)
+library(kableExtra)
+
+# ---- Load (mirrors refusal_analysis.Rmd setup) ------------------------------
+ANNOTATION_DIR <- file.path("..", "data", "annotations")
+PROMPT_SHA256  <- "238bb923037bb4126bef041f202fd6547e328aa62f4f61f06b8f63d784891fb1"
+
+L2_FEATURES <- c(
+  "explicit_nc", "implicit_nc", "apology", "hedge", "explanatory_preface",
+  "positive_alignment", "solidarity", "negative_stance",
+  "executed_alternative", "alternative_offer", "normative_suggestion",
+  "statement_of_principle", "role_based"
+)
+
+EXCLUDED_MODELS <- c("gpt-4-turbo", "llama-3-70b-instruct",
+                     "mistral-7b-instruct-v0.1")
+
+read_judged <- function(path) {
+  model <- str_replace(basename(path), "^responses_(.*)\\.judged\\.csv$", "\\1")
+  suppressWarnings(readr::read_csv(path, show_col_types = FALSE,
+    col_types = cols(.default = col_character()))) |>
+    mutate(model = model)
+}
+
+to_int_binary <- function(x) {
+  x <- na_if(trimws(x), "")
+  suppressWarnings(as.integer(x))
+}
+
+raw <- list.files(ANNOTATION_DIR, pattern = "^responses_.*\\.judged\\.csv$",
+                  full.names = TRUE) |>
+  map_dfr(read_judged) |>
+  filter(!model %in% EXCLUDED_MODELS)
+
+if (!"judge_skipped" %in% names(raw)) raw$judge_skipped <- NA_character_
+
+df <- raw |>
+  mutate(across(all_of(L2_FEATURES), to_int_binary),
+         parse_error   = if_else(parse_error   %in% c("True","TRUE","1"),
+                                 TRUE, FALSE, missing = FALSE),
+         judge_skipped = if_else(judge_skipped %in% c("True","TRUE","1"),
+                                 TRUE, FALSE, missing = FALSE)) |>
+  filter(is.na(judge_prompt_sha256) | judge_prompt_sha256 == "" |
+           judge_prompt_sha256 == PROMPT_SHA256)
+
+df_nc <- df |>
+  filter(!parse_error, !judge_skipped, layer0 == "Non-compliance")
+
+cat("In-voice NC rows used:", nrow(df_nc), "\n",
+    "Models:", n_distinct(df_nc$model), "\n",
+    "Harm categories:", n_distinct(df_nc$primary_llama_guard_category_name),
+    "\n")
+```
+
+```{r grid-setup}
+# Minimum cell size to include in dispersion calcs. Cells smaller than this
+# get filtered: their per-feature rates are too noisy to inform a SD.
+MIN_N <- 5
+
+# Long: one row per (model, harm, feature) with rate + n
+cell_long <- df_nc |>
+  filter(!is.na(primary_llama_guard_category_name)) |>
+  group_by(model, harm = primary_llama_guard_category_name) |>
+  summarise(
+    n_nc = n(),
+    across(all_of(L2_FEATURES), \(x) mean(x, na.rm = TRUE)),
+    .groups = "drop"
+  ) |>
+  pivot_longer(all_of(L2_FEATURES), names_to = "feature", values_to = "rate") |>
+  filter(n_nc >= MIN_N)
+
+cat("(model × harm) cells retained at MIN_N =", MIN_N, ":",
+    n_distinct(paste(cell_long$model, cell_long$harm)),
+    "of",
+    n_distinct(df_nc$model) * n_distinct(df_nc$primary_llama_guard_category_name),
+    "\n")
+```
+
+---
+
+# 1. Across-harm dispersion by model
+
+For each model, take its (harm × feature) rate matrix. Within each feature
+column, compute SD across harm categories — this captures how much the
+feature's rate moves as the harm type changes. Average across features to get
+a single per-model "harm-sensitivity" score: higher = the model's L2 output
+shifts more across harm categories; lower = the model uses roughly the same
+form everywhere.
+
+```{r across-harm-by-model}
+across_harm_by_model <- cell_long |>
+  group_by(model, feature) |>
+  summarise(sd_across_harm = sd(rate, na.rm = TRUE), .groups = "drop") |>
+  group_by(model) |>
+  summarise(mean_sd = mean(sd_across_harm, na.rm = TRUE),
+            .groups = "drop") |>
+  arrange(desc(mean_sd))
+
+across_harm_by_model |>
+  mutate(model = fct_reorder(model, mean_sd)) |>
+  ggplot(aes(mean_sd, model)) +
+  geom_col(fill = "steelblue") +
+  scale_x_continuous(labels = number_format(accuracy = 0.001)) +
+  labs(x = "Mean SD of L2 rate across harm categories",
+       y = NULL,
+       title = "How much does each model's L2 form shift across harm types?",
+       subtitle = "Higher = more harm-adaptive; lower = more uniform refusal style") +
+  theme_minimal(base_size = 11)
+
+across_harm_by_model |>
+  mutate(mean_sd = round(mean_sd, 4)) |>
+  kable(caption = "Per-model harm-sensitivity: mean (over L2 features) of SD (over harm categories) of feature rates.") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+## 1a. Per-model × per-feature heatmap
+
+Same data, unaggregated: shows *which features* are responsible for each
+model's harm-sensitivity score.
+
+```{r across-harm-by-model-feature, fig.height = 8}
+heat_mf <- cell_long |>
+  group_by(model, feature) |>
+  summarise(sd_across_harm = sd(rate, na.rm = TRUE), .groups = "drop")
+
+# Order features by total dispersion, models by overall harm-sensitivity
+feat_order  <- heat_mf |> group_by(feature) |>
+  summarise(s = sum(sd_across_harm, na.rm = TRUE)) |> arrange(s) |> pull(feature)
+model_order <- across_harm_by_model |> arrange(mean_sd) |> pull(model)
+
+heat_mf |>
+  mutate(feature = factor(feature, levels = feat_order),
+         model   = factor(model,   levels = model_order)) |>
+  ggplot(aes(feature, model, fill = sd_across_harm)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "C", labels = number_format(accuracy = 0.001)) +
+  labs(x = NULL, y = NULL, fill = "SD across\nharm cats",
+       title = "Per (model × feature) SD of rate across harm categories") +
+  theme_minimal(base_size = 10) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+---
+
+# 2. Across-model dispersion by harm
+
+Flip the axis. For each harm category, take its (model × feature) rate
+matrix. Within each feature column, compute SD across models — this captures
+how much models disagree on the appropriate L2 form for this kind of harm.
+Average across features for a per-harm "controversy" score.
+
+```{r across-model-by-harm}
+across_model_by_harm <- cell_long |>
+  group_by(harm, feature) |>
+  summarise(sd_across_model = sd(rate, na.rm = TRUE), .groups = "drop") |>
+  group_by(harm) |>
+  summarise(mean_sd = mean(sd_across_model, na.rm = TRUE),
+            .groups = "drop") |>
+  arrange(desc(mean_sd))
+
+across_model_by_harm |>
+  mutate(harm = fct_reorder(harm, mean_sd)) |>
+  ggplot(aes(mean_sd, harm)) +
+  geom_col(fill = "tomato3") +
+  scale_x_continuous(labels = number_format(accuracy = 0.001)) +
+  labs(x = "Mean SD of L2 rate across models",
+       y = NULL,
+       title = "Which harm categories elicit the most divergent L2 forms across models?",
+       subtitle = "Higher = models disagree more on the refusal form for this harm type") +
+  theme_minimal(base_size = 11)
+
+across_model_by_harm |>
+  mutate(mean_sd = round(mean_sd, 4)) |>
+  kable(caption = "Per-harm-category controversy: mean (over L2 features) of SD (over models) of feature rates.") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+## 2a. Per-harm × per-feature heatmap
+
+```{r across-model-by-harm-feature, fig.height = 7}
+heat_hf <- cell_long |>
+  group_by(harm, feature) |>
+  summarise(sd_across_model = sd(rate, na.rm = TRUE), .groups = "drop")
+
+feat_order_h <- heat_hf |> group_by(feature) |>
+  summarise(s = sum(sd_across_model, na.rm = TRUE)) |> arrange(s) |> pull(feature)
+harm_order   <- across_model_by_harm |> arrange(mean_sd) |> pull(harm)
+
+heat_hf |>
+  mutate(feature = factor(feature, levels = feat_order_h),
+         harm    = factor(harm,    levels = harm_order)) |>
+  ggplot(aes(feature, harm, fill = sd_across_model)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "C", labels = number_format(accuracy = 0.001)) +
+  labs(x = NULL, y = NULL, fill = "SD across\nmodels",
+       title = "Per (harm × feature) SD of rate across models") +
+  theme_minimal(base_size = 10) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+---
+
+# 3. Per-feature dispersion across the full (model × harm) grid
+
+Which L2 features carry the most signal full-stop? For each feature,
+compute SD of its rate across every (model × harm) cell that passes the
+MIN_N filter. Also report the cell mean rate so we can read floor/ceiling
+features (e.g. explicit_nc near 1 everywhere) against actually-bimodal ones.
+
+```{r per-feature}
+per_feature <- cell_long |>
+  group_by(feature) |>
+  summarise(
+    mean_rate = mean(rate, na.rm = TRUE),
+    sd_cells  = sd(rate, na.rm = TRUE),
+    min_rate  = min(rate, na.rm = TRUE),
+    max_rate  = max(rate, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  arrange(desc(sd_cells))
+
+per_feature |>
+  mutate(feature = fct_reorder(feature, sd_cells)) |>
+  ggplot(aes(sd_cells, feature)) +
+  geom_col(fill = "darkorchid4") +
+  geom_point(aes(x = mean_rate), color = "grey30", size = 2) +
+  scale_x_continuous(labels = number_format(accuracy = 0.01),
+                     sec.axis = sec_axis(~., name = "● mean cell rate",
+                                         labels = number_format(accuracy = 0.01))) +
+  labs(x = "SD of feature rate across (model × harm) cells",
+       y = NULL,
+       title = "Where's the L2 signal? Per-feature dispersion across the grid",
+       subtitle = "Bar = SD across cells (between-cell spread); dot = mean cell rate") +
+  theme_minimal(base_size = 11)
+
+per_feature |>
+  mutate(across(c(mean_rate, sd_cells, min_rate, max_rate),
+                \(x) percent(x, accuracy = 0.1))) |>
+  kable(caption = "Per-feature dispersion across (model × harm) cells. Read sd_cells against mean_rate: a low SD on a near-floor/ceiling feature is unsurprising; a low SD on a mid-range mean means real convergence.") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+---
+
+# 4. Joint reader: top-variation features in context
+
+For the top-3 most dispersive features (from §3), show their full
+(model × harm) rate matrix as a heatmap. This is where the action is.
+
+```{r top-feature-heatmaps, fig.height = 5}
+top_feats <- per_feature |> slice_max(sd_cells, n = 3) |> pull(feature)
+
+for (f in top_feats) {
+  p <- cell_long |>
+    filter(feature == f) |>
+    ggplot(aes(harm, model, fill = rate)) +
+    geom_tile(color = "white") +
+    scale_fill_viridis_c(option = "B", limits = c(0, 1),
+                         labels = percent_format(accuracy = 1)) +
+    labs(x = NULL, y = NULL, fill = "rate",
+         title = paste0("Feature: ", f, " — rate by (model × harm)")) +
+    theme_minimal(base_size = 10) +
+    theme(axis.text.x = element_text(angle = 35, hjust = 1))
+  print(p)
+}
+```
+
+---
+
+# Notes
+
+- Denominator throughout is **in-voice NC only** (service-level rows and
+  parse-errors filtered out). A model that rarely refuses for some harm
+  category gets a smaller-n cell that may be filtered by `MIN_N`.
+- All-zero columns within a (model × harm) cell yield 0 rate — distinct from
+  NA. The SD machinery treats those as real zeros, which is correct for L2
+  ("model never used apology on these prompts").
+- Variance vs Bernoulli entropy: for binary features, both rank cells the
+  same way (entropy is monotone in `p(1-p)` for `p ≤ 0.5`); SD is more
+  interpretable as "percentage-point spread".

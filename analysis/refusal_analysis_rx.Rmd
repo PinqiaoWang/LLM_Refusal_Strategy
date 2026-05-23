@@ -432,7 +432,7 @@ family_legend <- tibble(
 
 ggplot(l2_tbl, aes(feature, model)) +
   geom_tile(aes(fill = tile_fill), colour = "white", linewidth = 0.4) +
-  geom_text(aes(label = percent(rate, accuracy = 1)), size = 3.8, vjust = 1) +
+  geom_text(aes(label = percent(rate, accuracy = 1)), size = 3.8, vjust = 0.5) +
   geom_point(
     data = family_legend,
     aes(feature, model, colour = family),
@@ -445,8 +445,9 @@ ggplot(l2_tbl, aes(feature, model)) +
   scale_x_discrete(position = "top", labels = L2_FEATURE_LABELS, drop = TRUE) +
   facet_grid(family ~ feature_group, scales = "free", space = "free", switch = "y") +
   labs(x = NULL, y = NULL,
-       title = "Overall L2 feature distribution by model") +
-  theme_minimal(base_size = 16) +
+       # title = "Overall L2 feature distribution by model"
+       ) +
+  theme_minimal(base_size = 24) +
   theme(
     plot.title = element_text(face = "bold", size = 20),
     axis.text.x = element_text(size = 10.5, angle = 0, hjust = 0.5, vjust = 0.5, lineheight = 0.9),
@@ -461,9 +462,9 @@ ggplot(l2_tbl, aes(feature, model)) +
     strip.background.y = element_blank(),
     panel.spacing = unit(0.6, "lines")
   ) +
-  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 4)))
+  guides(colour = guide_legend(nrow = 1, override.aes = list(alpha = 1, size = 4)))
 
-ggsave("figs/layer2_model_heatmap.pdf", width = 12, height = 7, dpi = 300)
+ggsave("figs/layer2_model_heatmap.pdf", width = 14, height = 7, dpi = 300)
 ```
 
 ## 4.2 Cross-model spread in L2 strategies
@@ -654,21 +655,22 @@ apology_events <- apology_timeline |>
     x_label = format(release_date, "%b %d\n%Y"),
     point_label = as.character(model),
     label_x = case_when(
-      as.character(model) == "gpt-4o" ~ event_x + 1.05,
-      as.character(model) == "gpt-5" ~ event_x - 0.22,
+      as.character(model) == "gpt-4o" ~ event_x,
+      as.character(model) == "gpt-5" ~ event_x + 0.22,
       as.character(model) == "gpt-5.3" ~ event_x + 0.36,
-      as.character(model) == "claude-sonnet-3.7" ~ event_x - 0.32,
-      as.character(model) == "claude-opus-4.6" ~ event_x - 0.46,
-      as.character(model) == "claude-sonnet-4.6" ~ event_x + 0.56,
+      as.character(model) == "claude-sonnet-3.7" ~ event_x - 1.0,
+      as.character(model) == "claude-opus-4.6" ~ event_x + 0.46,
+      as.character(model) == "claude-sonnet-4.6" ~ event_x,
       TRUE ~ event_x
     ),
     label_y = case_when(
-      as.character(model) == "gpt-4o" ~ pmax(apology_rate - 0.10, 0.04),
+      # as.character(model) == "gpt-4o" ~ pmax(apology_rate - 0.10, 0.04),
+      as.character(model) == "gpt-4o" ~ 0.98,
       as.character(model) == "gpt-5" ~ apology_rate + 0.08,
       as.character(model) == "gpt-5.3" ~ apology_rate + 0.08,
       as.character(model) == "claude-sonnet-3.7" ~ apology_rate + 0.08,
       as.character(model) == "claude-opus-4.6" ~ apology_rate + 0.12,
-      as.character(model) == "claude-sonnet-4.6" ~ apology_rate + 0.09,
+      as.character(model) == "claude-sonnet-4.6" ~ apology_rate + 0.05,
       TRUE ~ apology_rate + 0.08
     )
   )
@@ -706,13 +708,13 @@ ggplot(apology_events, aes(event_x, apology_rate, colour = family)) +
   geom_segment(aes(x = label_x, xend = event_x, y = label_y, yend = apology_rate),
                colour = "black", linewidth = 0.35, show.legend = FALSE) +
   geom_text(aes(x = label_x, y = label_y, label = point_label),
-            colour = "black", size = 3.1, lineheight = 0.9, show.legend = FALSE) +
+            colour = "black", size = 4.2, lineheight = 0.9, show.legend = FALSE) +
   geom_text(
     data = apology_decay_endpoints,
     aes(x = x_end, y = (y_start + y_end) / 2, label = change_label),
     inherit.aes = FALSE,
     hjust = 0.5,
-    size = 3.8,
+    size = 4.2,
     fontface = "bold",
     colour = "black"
   ) +
@@ -724,11 +726,11 @@ ggplot(apology_events, aes(event_x, apology_rate, colour = family)) +
   scale_y_continuous(labels = percent_format(1),
                      expand = expansion(mult = c(0, 0.05))) +
   scale_colour_manual(values = c(OpenAI = "#1b9e77", Anthropic = "#d95f02"),
-                      labels = c(OpenAI = "OpenAI", Anthropic = "Claude / Anthropic")) +
+                      labels = c(OpenAI = "OpenAI", Anthropic = "Anthropic")) +
   coord_cartesian(ylim = c(0, 1), clip = "off") +
   labs(x = "Release day",
        y = "Apology rate", colour = NULL) +
-  theme_classic(base_size = 11) +
+  theme_classic(base_size = 18) +
   theme(
     legend.position = c(0.94, 0.88),
     legend.background = element_blank(),
