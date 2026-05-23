@@ -1850,6 +1850,7 @@ Heatmap of L2 feature rates faceted by harm category, restricted to the four
 flagships. Same `MIN_CELL_N` mask as §5.5 to suppress unreliable rates.
 
 ```{r flagship-l2-by-cat, fig.height = 16, fig.width = 10}
+
 flag_l2_cat <- df_flag_nc |>
   select(model, category = primary_llama_guard_category_name,
          all_of(L2_FEATURES)) |>
@@ -1878,6 +1879,25 @@ ggplot(flag_l2_cat, aes(feature, model, fill = rate)) +
   theme_minimal(base_size = 9) +
   theme(axis.text.x = element_text(angle = 45, hjust = 0, vjust = -0.2),
         strip.text = element_text(face = "bold"))
+```
+
+```{r}
+
+flag_l2_cat |>
+  ggplot(aes(feature, rate, fill = model)) +
+    geom_col(position = position_dodge(width = 0.9), width = 0.85) +
+    scale_y_continuous(labels = percent_format(1), expand = expansion(mult = c(0, 0.05))) +
+    scale_fill_manual(values = flag_pal) +
+    labs(x = NULL, y = "rate (within NC)", fill = NULL,
+         title = "Flagship comparison: L2 feature rates (within Non-compliance)",
+         subtitle = "Higher bars indicate a feature appears more often in this model's refusals") +
+    theme_minimal(base_size = 11) +
+    theme(axis.text.x = element_text(angle = 30, hjust = 0, vjust = -0.2),
+          legend.position = "bottom") + 
+  facet_grid(category ~ .)
+
+ggsave("harm_type_model.pdf", width = 30, height = 30)
+
 ```
 
 ### Mitigation profile, side-by-side
