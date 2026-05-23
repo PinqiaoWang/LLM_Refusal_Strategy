@@ -299,6 +299,281 @@ for (f in top_feats) {
 
 ---
 
+# 5. L2 feature co-occurrence
+
+Phi correlation (Pearson on 0/1) at the **response level** across all in-voice
+NC rows. Tells us which features bundle together in the same refusal. The
+`hedge` column is all-zero so it drops out of the matrix.
+
+```{r l2-corr-matrix, fig.height = 7, fig.width = 8}
+l2_mat <- df_nc |>
+  select(all_of(L2_FEATURES)) |>
+  mutate(across(everything(), \(x) replace_na(x, 0L))) |>
+  select(where(\(x) sd(x, na.rm = TRUE) > 0)) |>
+  as.matrix()
+
+l2_corr <- cor(l2_mat, use = "pairwise.complete.obs")
+
+# Reorder by hierarchical clustering so blocks are visible
+hc <- hclust(as.dist(1 - l2_corr), method = "average")
+ord <- hc$labels[hc$order]
+
+l2_corr_long <- as_tibble(l2_corr, rownames = "f1") |>
+  pivot_longer(-f1, names_to = "f2", values_to = "r") |>
+  mutate(f1 = factor(f1, levels = ord),
+         f2 = factor(f2, levels = ord))
+
+ggplot(l2_corr_long, aes(f1, f2, fill = r)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = sprintf("%.2f", r)), size = 2.6,
+            color = ifelse(abs(l2_corr_long$r) > 0.5, "white", "grey20")) +
+  scale_fill_gradient2(low = "#b2182b", mid = "white", high = "#2166ac",
+                       midpoint = 0, limits = c(-1, 1)) +
+  labs(x = NULL, y = NULL, fill = "phi (r)",
+       title = "L2 feature co-occurrence (phi correlation, in-voice NC)",
+       subtitle = "Ordered by hierarchical clustering on (1 - r). Blocks = features that bundle.") +
+  theme_minimal(base_size = 10) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid = element_blank())
+```
+
+## 5a. Strongest pairs
+
+```{r l2-corr-pairs}
+pair_tbl <- l2_corr_long |>
+  filter(as.integer(f1) < as.integer(f2)) |>
+  mutate(across(c(f1, f2), as.character)) |>
+  arrange(desc(abs(r)))
+
+bind_rows(
+  pair_tbl |> slice_max(r,  n = 10) |> mutate(kind = "Most positive"),
+  pair_tbl |> slice_min(r,  n = 10) |> mutate(kind = "Most negative")
+) |>
+  mutate(r = round(r, 3)) |>
+  select(kind, f1, f2, r) |>
+  kable(caption = "Top 10 positive and top 10 negative L2 feature pairings (phi correlation across in-voice NC rows).") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+## 5b. Aside — bundle internal coherence
+
+Cross-check against the four-bundle taxonomy from `refusal_analysis.Rmd`:
+mean within-bundle correlation vs cross-bundle baseline. If the bundles are
+empirically coherent, within > between.
+
+```{r l2-corr-bundles}
+FEATURE_FAMILY <- list(
+  rapport    = c("solidarity", "positive_alignment"),
+  concessive = c("apology", "hedge", "explanatory_preface", "role_based"),
+  normative  = c("normative_suggestion", "negative_stance", "statement_of_principle"),
+  helpful    = c("alternative_offer", "executed_alternative")
+)
+
+bundle_lookup <- enframe(FEATURE_FAMILY, name = "bundle", value = "feature") |>
+  unnest(feature) |>
+  filter(feature %in% rownames(l2_corr))
+
+bundle_stats <- l2_corr_long |>
+  filter(as.character(f1) < as.character(f2)) |>
+  mutate(across(c(f1, f2), as.character)) |>
+  left_join(bundle_lookup, by = c("f1" = "feature")) |>
+  rename(bundle_f1 = bundle) |>
+  left_join(bundle_lookup, by = c("f2" = "feature")) |>
+  rename(bundle_f2 = bundle) |>
+  mutate(within = !is.na(bundle_f1) & !is.na(bundle_f2) & bundle_f1 == bundle_f2,
+         bundle = if_else(within, bundle_f1, "cross-bundle"))
+
+bundle_stats |>
+  group_by(bundle) |>
+  summarise(n_pairs = n(), mean_r = round(mean(r), 3), .groups = "drop") |>
+  arrange(bundle != "cross-bundle", desc(mean_r)) |>
+  kable(caption = "Mean phi correlation within each bundle vs cross-bundle baseline. Within > cross supports the bundle grouping.") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+---
+
+# 6. RSA: which harm types are most similar in L2 form?
+
+Borrowing the RSA setup. Treat each harm category as a stimulus, give it a
+**representation** = its L2 feature rate vector. Then compute pairwise
+similarity to ask: do models respond to "Violent Crimes" and "Indiscriminate
+Weapons" with the same kind of refusal, but to "Specialized Advice" with
+something else?
+
+Two flavours below. **6a** aggregates over models (the average refusal-form
+fingerprint for the harm type). **6b** is model-aware (stacks per-model
+vectors), which is the proper RSA move — it asks whether harm types elicit
+similar *patterns of model behaviour* rather than just similar average rates.
+
+## 6a. Harm-level RSA (aggregated over models)
+
+```{r rsa-harm-aggregate, fig.height = 7, fig.width = 8}
+# One vector per harm: mean L2 rate across all in-voice NC rows in that harm
+harm_profiles <- df_nc |>
+  filter(!is.na(primary_llama_guard_category_name)) |>
+  group_by(harm = primary_llama_guard_category_name) |>
+  summarise(across(all_of(L2_FEATURES), \(x) mean(x, na.rm = TRUE)),
+            n = n(), .groups = "drop")
+
+# Drop zero-variance features (e.g. hedge); use Pearson r as similarity
+harm_mat <- harm_profiles |>
+  select(all_of(L2_FEATURES)) |>
+  select(where(\(x) sd(x, na.rm = TRUE) > 0)) |>
+  as.matrix()
+rownames(harm_mat) <- harm_profiles$harm
+
+rsa_harm <- cor(t(harm_mat))
+
+# Cluster for ordering
+hc_h <- hclust(as.dist(1 - rsa_harm), method = "average")
+ord_h <- hc_h$labels[hc_h$order]
+
+as_tibble(rsa_harm, rownames = "h1") |>
+  pivot_longer(-h1, names_to = "h2", values_to = "r") |>
+  mutate(h1 = factor(h1, levels = ord_h),
+         h2 = factor(h2, levels = ord_h)) |>
+  ggplot(aes(h1, h2, fill = r)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = sprintf("%.2f", r)), size = 2.4,
+            color = "grey20") +
+  scale_fill_gradient2(low = "#b2182b", mid = "white", high = "#2166ac",
+                       midpoint = 0, limits = c(-1, 1)) +
+  labs(x = NULL, y = NULL, fill = "r",
+       title = "Harm-type similarity in L2 form (aggregated over models)",
+       subtitle = "Pearson correlation of mean L2 rate vectors") +
+  theme_minimal(base_size = 9) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid = element_blank())
+```
+
+```{r rsa-harm-dendrogram, fig.height = 4}
+plot(hc_h, hang = -1, main = "Harm-type clustering on L2 form (aggregated)",
+     xlab = "", sub = "", cex = 0.85)
+```
+
+## 6b. Model-aware RSA
+
+Each harm's representation = 16 models × 12 features = 192-dim vector (stack
+per-model rate vectors). Pearson similarity on the full vector picks up cases
+where two harms produce the *same models-do-X-and-other-models-do-Y* pattern,
+not just the same marginal rates.
+
+```{r rsa-harm-modelaware, fig.height = 7, fig.width = 8}
+features_kept <- L2_FEATURES[apply(harm_mat, 2, sd) > 0 |
+                              L2_FEATURES %in% colnames(harm_mat)]
+features_kept <- intersect(features_kept, colnames(harm_mat))
+
+stacked <- df_nc |>
+  filter(!is.na(primary_llama_guard_category_name)) |>
+  group_by(harm = primary_llama_guard_category_name, model) |>
+  summarise(n = n(),
+            across(all_of(features_kept), \(x) mean(x, na.rm = TRUE)),
+            .groups = "drop")
+
+# A model with zero NCs for a given harm contributes nothing; impute the
+# harm-marginal rate so missing cells don't bias similarity.
+harm_mean <- df_nc |>
+  filter(!is.na(primary_llama_guard_category_name)) |>
+  group_by(harm = primary_llama_guard_category_name) |>
+  summarise(across(all_of(features_kept), \(x) mean(x, na.rm = TRUE)),
+            .groups = "drop")
+
+all_grid <- expand_grid(
+  harm  = unique(stacked$harm),
+  model = unique(df_nc$model)
+)
+stacked_full <- all_grid |>
+  left_join(stacked, by = c("harm", "model")) |>
+  left_join(harm_mean, by = "harm", suffix = c("", "_marg")) |>
+  mutate(across(all_of(features_kept),
+                ~ if_else(is.na(.x), get(paste0(cur_column(), "_marg")), .x))) |>
+  select(harm, model, all_of(features_kept))
+
+# Build harm × (model*feature) wide matrix
+stacked_wide <- stacked_full |>
+  pivot_longer(all_of(features_kept), names_to = "feature", values_to = "rate") |>
+  mutate(col = paste(model, feature, sep = "__")) |>
+  select(harm, col, rate) |>
+  pivot_wider(names_from = col, values_from = rate)
+
+rsa_mat <- stacked_wide |> select(-harm) |> as.matrix()
+rownames(rsa_mat) <- stacked_wide$harm
+
+rsa_harm_ma <- cor(t(rsa_mat))
+
+hc_ma <- hclust(as.dist(1 - rsa_harm_ma), method = "average")
+ord_ma <- hc_ma$labels[hc_ma$order]
+
+as_tibble(rsa_harm_ma, rownames = "h1") |>
+  pivot_longer(-h1, names_to = "h2", values_to = "r") |>
+  mutate(h1 = factor(h1, levels = ord_ma),
+         h2 = factor(h2, levels = ord_ma)) |>
+  ggplot(aes(h1, h2, fill = r)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = sprintf("%.2f", r)), size = 2.4, color = "grey20") +
+  scale_fill_gradient2(low = "#b2182b", mid = "white", high = "#2166ac",
+                       midpoint = 0, limits = c(-1, 1)) +
+  labs(x = NULL, y = NULL, fill = "r",
+       title = "Harm-type similarity in L2 form (model-aware)",
+       subtitle = "Pearson r over 16-model × 12-feature stacked rate vectors") +
+  theme_minimal(base_size = 9) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid = element_blank())
+```
+
+```{r rsa-harm-mds, fig.height = 5, fig.width = 6}
+# 2D MDS layout on (1-r) distance
+d <- as.dist(1 - rsa_harm_ma)
+mds <- cmdscale(d, k = 2) |> as_tibble(rownames = "harm") |>
+  rename(x = V1, y = V2)
+
+ggplot(mds, aes(x, y, label = harm)) +
+  geom_point(size = 2.5, color = "steelblue") +
+  ggrepel::geom_text_repel(size = 3, max.overlaps = Inf) +
+  labs(x = "MDS dim 1", y = "MDS dim 2",
+       title = "Harm-type embedding from L2 form (MDS on model-aware RSA)") +
+  theme_minimal(base_size = 10)
+```
+
+## 6c. Aggregated vs model-aware: do they agree?
+
+If the two matrices agree, the aggregated view is a sufficient summary. If
+they diverge, that means harm types differ in *cross-model agreement
+patterns* over and above their average forms.
+
+```{r rsa-agreement}
+# Vectorise both RSA matrices over the same harm order, off-diagonal only
+common <- intersect(rownames(rsa_harm), rownames(rsa_harm_ma))
+upper <- function(m) {
+  m <- m[common, common]
+  m[upper.tri(m)]
+}
+agreement <- cor(upper(rsa_harm), upper(rsa_harm_ma))
+cat("Pearson r between aggregated and model-aware harm-RSA matrices:",
+    round(agreement, 3), "\n")
+```
+
+## 6d. Top similar / dissimilar harm pairs (model-aware)
+
+```{r rsa-top-pairs}
+rsa_pairs <- as_tibble(rsa_harm_ma, rownames = "h1") |>
+  pivot_longer(-h1, names_to = "h2", values_to = "r") |>
+  filter(h1 < h2) |>
+  arrange(desc(r))
+
+bind_rows(
+  rsa_pairs |> slice_max(r, n = 8) |> mutate(kind = "Most similar"),
+  rsa_pairs |> slice_min(r, n = 8) |> mutate(kind = "Most dissimilar")
+) |>
+  mutate(r = round(r, 3)) |>
+  select(kind, h1, h2, r) |>
+  kable(caption = "Most and least similar harm-type pairs in L2 form (model-aware RSA).") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+---
+
 # Notes
 
 - Denominator throughout is **in-voice NC only** (service-level rows and

@@ -1900,6 +1900,53 @@ ggsave("harm_type_model.pdf", width = 30, height = 30)
 
 ```
 
+```{r}
+
+unique(flag_l2_cat$category)
+unique(flag_l2_cat$feature)
+
+```
+
+```{r}
+
+
+flag_l2_cat |>
+  filter(
+    category %in% c(
+      "Violent Crimes",
+      "Suicide & Self-Harm",
+      # "Non-Violent Crimes",
+      "Child Sexual Exploitation",
+      # "Sexual Content",
+      "Specialized Advice"
+    ),
+    feature %in% c(
+      # "alternative_offer",
+      "apology",
+      "executed_alternative",
+      # "explanatory_preface",
+      "negative_stance",
+      "normative_suggestion",
+      "positive_alignment",
+      "solidarity"
+      # "statement_of_principle"
+    )
+  ) |>
+  ggplot(aes(feature, rate, fill = model)) +
+    geom_col(position = position_dodge(width = 0.9), width = 0.85) +
+    scale_y_continuous(labels = percent_format(1), expand = expansion(mult = c(0, 0.05))) +
+    scale_fill_manual(values = flag_pal) +
+    labs(x = NULL, y = "Feature Frequency", fill = NULL,
+         ) +
+    theme_minimal(base_size = 18) +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1, vjust = 1),
+          legend.position = "bottom") + 
+  facet_grid(category ~ .)
+
+ggsave("figs/harm_type_model_subset.pdf", width = 7, height = 9)
+
+```
+
 ### Mitigation profile, side-by-side
 
 ```{r flagship-affiliative, fig.height = 4}
