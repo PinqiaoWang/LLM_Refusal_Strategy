@@ -29,6 +29,9 @@ if (requireNamespace("kableExtra", quietly = TRUE)) {
 } else {
   kable_styling <- function(kable_input, ...) kable_input
 }
+if (requireNamespace("ggalluvial", quietly = TRUE)) {
+  library(ggalluvial)
+}
 
 # ---- Config -----------------------------------------------------------------
 ANNOTATION_DIR <- file.path("..", "data", "annotations")
@@ -429,7 +432,7 @@ family_legend <- tibble(
 
 ggplot(l2_tbl, aes(feature, model)) +
   geom_tile(aes(fill = tile_fill), colour = "white", linewidth = 0.4) +
-  geom_text(aes(label = percent(rate, accuracy = 1)), size = 4.2, vjust = 1) +
+  geom_text(aes(label = percent(rate, accuracy = 1)), size = 3.8, vjust = 1) +
   geom_point(
     data = family_legend,
     aes(feature, model, colour = family),
@@ -443,13 +446,13 @@ ggplot(l2_tbl, aes(feature, model)) +
   facet_grid(family ~ feature_group, scales = "free", space = "free", switch = "y") +
   labs(x = NULL, y = NULL,
        title = "Overall L2 feature distribution by model") +
-  theme_minimal(base_size = 15) +
+  theme_minimal(base_size = 16) +
   theme(
     plot.title = element_text(face = "bold", size = 20),
-    axis.text.x = element_text(size = 11.5, angle = 0, hjust = 0.5, vjust = 0.5, lineheight = 0.9),
-    axis.text.y = element_text(size = 12),
-    legend.title = element_text(size = 13, face = "bold"),
-    legend.text = element_text(size = 12),
+    axis.text.x = element_text(size = 10.5, angle = 0, hjust = 0.5, vjust = 0.5, lineheight = 0.9),
+    axis.text.y = element_text(size = 12.5),
+    legend.title = element_text(size = 13.5, face = "bold"),
+    legend.text = element_text(size = 12.5),
     legend.position = "bottom",
     strip.placement = "outside",
     strip.text.y.left = element_blank(),
@@ -460,7 +463,7 @@ ggplot(l2_tbl, aes(feature, model)) +
   ) +
   guides(colour = guide_legend(override.aes = list(alpha = 1, size = 4)))
 
-ggsave("figs/layer2_model_heatmap.pdf", width = 9, height = 7, dpi = 300)
+ggsave("figs/layer2_model_heatmap.pdf", width = 12, height = 7, dpi = 300)
 ```
 
 ## 4.2 Cross-model spread in L2 strategies
@@ -560,7 +563,7 @@ ggplot(l2_model_delta, aes(x = delta, y = fct_rev(feature), group = feature, fil
     legend.position = "bottom"
   )
 
-ggsave("figs/layer2_strategy_spread.pdf", width = 7, height = 5.8, dpi = 300)
+ggsave("figs/layer2_strategy_spread.pdf", width = 7, height = 7, dpi = 300)
 ```
 
 ```{r l2-strategy-spread-summary}
@@ -639,28 +642,152 @@ apology_timeline <- df_nc |>
   summarise(apology_rate = mean(apology), n = n(), .groups = "drop") |>
   left_join(MODEL_RELEASE_DATES, by = c("model", "family"))
 
-ggplot(apology_timeline,
-       aes(release_date, apology_rate, colour = family, group = family)) +
-  geom_line(linewidth = 0.9) +
-  geom_point(size = 3) +
-  geom_text(aes(label = paste0(as.character(model), "\n", percent(apology_rate, accuracy = 1))),
-            hjust = -0.08, vjust = 0.5, size = 3.1, show.legend = FALSE) +
-  scale_x_date(date_breaks = "3 months", date_labels = "%b %Y",
-               expand = expansion(mult = c(0.03, 0.22))) +
-  scale_y_continuous(labels = percent_format(1),
-                     limits = c(0, NA),
-                     expand = expansion(mult = c(0, 0.12))) +
-  scale_colour_manual(values = c(OpenAI = "#1b9e77", Anthropic = "#d95f02")) +
-  labs(x = NULL, y = "Apology rate among in-voice refusals", colour = NULL,
-       title = "Apology decay across OpenAI and Claude releases",
-       subtitle = "Base/non-reasoning models only; labels show model and apology rate") +
-  theme_classic(base_size = 11) +
-  theme(
-    axis.text.x = element_text(angle = 30, hjust = 1),
-    legend.position = "bottom"
+apology_events <- apology_timeline |>
+  arrange(release_date, family) |>
+  mutate(
+    raw_x = as.numeric(release_date - min(release_date)) / 120,
+    expand_start = as.Date("2026-02-01"),
+    expand_anchor = as.numeric(expand_start - min(release_date)) / 120,
+    event_x = if_else(release_date >= expand_start,
+                      expand_anchor + as.numeric(release_date - expand_start) / 8,
+                      raw_x),
+    x_label = format(release_date, "%b %d\n%Y"),
+    point_label = as.character(model),
+    label_x = case_when(
+      as.character(model) == "gpt-4o" ~ event_x + 1.05,
+      as.character(model) == "gpt-5" ~ event_x - 0.22,
+      as.character(model) == "gpt-5.3" ~ event_x + 0.36,
+      as.character(model) == "claude-sonnet-3.7" ~ event_x - 0.32,
+      as.character(model) == "claude-opus-4.6" ~ event_x - 0.46,
+      as.character(model) == "claude-sonnet-4.6" ~ event_x + 0.56,
+      TRUE ~ event_x
+    ),
+    label_y = case_when(
+      as.character(model) == "gpt-4o" ~ pmax(apology_rate - 0.10, 0.04),
+      as.character(model) == "gpt-5" ~ apology_rate + 0.08,
+      as.character(model) == "gpt-5.3" ~ apology_rate + 0.08,
+      as.character(model) == "claude-sonnet-3.7" ~ apology_rate + 0.08,
+      as.character(model) == "claude-opus-4.6" ~ apology_rate + 0.12,
+      as.character(model) == "claude-sonnet-4.6" ~ apology_rate + 0.09,
+      TRUE ~ apology_rate + 0.08
+    )
   )
 
-ggsave("figs/apology_decay_timeline.pdf", width = 9.5, height = 5, dpi = 300)
+apology_decay_endpoints <- apology_events |>
+  group_by(family) |>
+  arrange(release_date, .by_group = TRUE) |>
+  summarise(
+    x_start = first(event_x),
+    x_end = last(event_x),
+    y_start = first(apology_rate),
+    y_end = last(apology_rate),
+    change_label = paste0(if_else(y_end - y_start < 0, "", "+"),
+                          percent(y_end - y_start, accuracy = 1)),
+    .groups = "drop"
+  )
+
+ggplot(apology_events, aes(event_x, apology_rate, colour = family)) +
+  geom_line(aes(group = family), linewidth = 0.9) +
+  geom_segment(
+    data = apology_decay_endpoints,
+    aes(x = x_start, xend = x_end, y = y_start, yend = y_start, colour = family),
+    inherit.aes = FALSE,
+    linetype = "dashed",
+    linewidth = 0.65
+  ) +
+  geom_segment(
+    data = apology_decay_endpoints,
+    aes(x = x_end, xend = x_end, y = y_start, yend = y_end, colour = family),
+    inherit.aes = FALSE,
+    linetype = "dashed",
+    linewidth = 0.65
+  ) +
+  geom_point(size = 3.6) +
+  geom_segment(aes(x = label_x, xend = event_x, y = label_y, yend = apology_rate),
+               colour = "black", linewidth = 0.35, show.legend = FALSE) +
+  geom_text(aes(x = label_x, y = label_y, label = point_label),
+            colour = "black", size = 3.1, lineheight = 0.9, show.legend = FALSE) +
+  geom_text(
+    data = apology_decay_endpoints,
+    aes(x = x_end, y = (y_start + y_end) / 2, label = change_label),
+    inherit.aes = FALSE,
+    hjust = 0.5,
+    size = 3.8,
+    fontface = "bold",
+    colour = "black"
+  ) +
+  scale_x_continuous(
+    breaks = apology_events$event_x,
+    labels = apology_events$x_label,
+    expand = expansion(mult = c(0.08, 0.18))
+  ) +
+  scale_y_continuous(labels = percent_format(1),
+                     expand = expansion(mult = c(0, 0.05))) +
+  scale_colour_manual(values = c(OpenAI = "#1b9e77", Anthropic = "#d95f02"),
+                      labels = c(OpenAI = "OpenAI", Anthropic = "Claude / Anthropic")) +
+  coord_cartesian(ylim = c(0, 1), clip = "off") +
+  labs(x = "Release day",
+       y = "Apology rate", colour = NULL) +
+  theme_classic(base_size = 11) +
+  theme(
+    legend.position = c(0.94, 0.88),
+    legend.background = element_blank(),
+    plot.margin = margin(t = 10, r = 35, b = 10, l = 10)
+  )
+
+ggsave("figs/apology_decay_timeline.pdf", width = 7, height = 7, dpi = 300)
+```
+
+```{r apology-decay-openai-alluvial, fig.height = 4.8, fig.width = 8.5}
+openai_apology_yearly <- apology_timeline |>
+  filter(family == "OpenAI") |>
+  mutate(release_year = lubridate::year(release_date)) |>
+  group_by(release_year) |>
+  summarise(
+    apology_rate = weighted.mean(apology_rate, w = n),
+    n_models = n(),
+    n_refusals = sum(n),
+    models = paste(as.character(model), collapse = ", "),
+    .groups = "drop"
+  ) |>
+  arrange(release_year) |>
+  mutate(
+    next_year = lead(release_year),
+    next_rate = lead(apology_rate),
+    change = next_rate - apology_rate,
+    abs_change = abs(change),
+    node_label = paste0(models, "\n", percent(apology_rate, accuracy = 1))
+  )
+
+openai_alluvial <- openai_apology_yearly |>
+  transmute(
+    family = "OpenAI",
+    axis = factor(release_year, levels = c(2024, 2025, 2026)),
+    model_node = paste0(models, "\n", percent(apology_rate, accuracy = 1)),
+    apology_rate
+  )
+
+ggplot(openai_alluvial,
+       aes(x = axis, stratum = model_node, alluvium = family,
+           y = apology_rate, fill = family, label = model_node)) +
+  ggalluvial::geom_flow(alpha = 0.45, curve_type = "sigmoid",
+                        colour = "#1b9e77", linewidth = 0.2) +
+  ggalluvial::geom_stratum(width = 0.22, colour = "#1b9e77",
+                           fill = "white", linewidth = 0.8) +
+  geom_text(stat = "stratum", size = 3.2, colour = "grey15") +
+  scale_y_continuous(labels = percent_format(1),
+                     expand = expansion(mult = c(0.02, 0.08))) +
+  scale_fill_manual(values = c(OpenAI = "#1b9e77"), guide = "none") +
+  labs(x = NULL, y = "Average apology rate",
+       title = "OpenAI apology decay by release year",
+       subtitle = "Alluvial flow width represents apology rate among in-voice refusals") +
+  theme_classic(base_size = 11) +
+  theme(
+    axis.line.x = element_blank(),
+    axis.ticks.x = element_blank()
+  )
+
+ggsave("figs/apology_decay_openai_alluvial.pdf", width = 9, height = 5, dpi = 300)
 ```
 
 ```{r apology-decay-table}
@@ -776,24 +903,44 @@ l2_cat_delta <- df_nc |>
     category = factor(category, levels = cat_order)
   )
 
-ggplot(l2_cat_delta, aes(feature, category, fill = delta)) +
+signed_log_delta <- function(x, sigma = 0.02) {
+  sign(x) * log1p(abs(x) / sigma)
+}
+
+delta_breaks_raw <- c(-0.50, -0.10, 0, 0.10, 0.50)
+delta_limit <- signed_log_delta(0.60)
+
+l2_cat_delta <- l2_cat_delta |>
+  mutate(delta_colour = signed_log_delta(delta))
+
+p_l2_harm_difference <- ggplot(l2_cat_delta, aes(feature, category, fill = delta_colour)) +
   geom_tile(colour = "white", linewidth = 0.25) +
   geom_text(aes(label = percent(delta, accuracy = 1)), size = 2.7) +
   scale_fill_gradient2(
-    low = "#2166ac",
+    low = "#b2182b",
     mid = "#f7f7f7",
-    high = "#b2182b",
+    high = "#1b7837",
     midpoint = 0,
-    labels = percent_format(1),
-    name = "Category minus\nfeature baseline"
+    limits = c(-delta_limit, delta_limit),
+    breaks = signed_log_delta(delta_breaks_raw),
+    labels = percent(delta_breaks_raw, accuracy = 1),
+    name = "Category -\nbaseline"
   ) +
   scale_x_discrete(position = "top") +
-  labs(x = NULL, y = NULL,
-       title = "L2 feature shifts by harm category",
-       subtitle = "Difference scale: positive values mean the feature is more common in that harm category than overall") +
+  labs(x = NULL, y = NULL) +
   theme_minimal(base_size = 10) +
   theme(axis.text.x = element_text(angle = 45, hjust = 0, vjust = 0),
-        legend.position = "bottom")
+        legend.position = "bottom") +
+  guides(fill = guide_colourbar(
+    title.position = "left",
+    title.vjust = 0.5,
+    barwidth = unit(9, "cm"),
+    barheight = unit(0.45, "cm")
+  ))
+
+p_l2_harm_difference
+
+ggsave("figs/l2_harm_difference_scale.pdf", plot = p_l2_harm_difference, width = 7, height = 7, dpi = 300)
 ```
 
 ```{r l2-mod-cat-plot-1, fig.height = 18, fig.width = 11}
@@ -1014,7 +1161,7 @@ HARM_TIER_DESC |>
 ```{r harm-tier-rate-plot, fig.height = 4.8, fig.width = 8.5}
 overall_nc_rate <- mean(df_clean$layer0 == "Non-compliance", na.rm = TRUE)
 
-HARM_CATEGORY_RATES |>
+p_harm_tier_rate <- HARM_CATEGORY_RATES |>
   mutate(category = fct_reorder(category, refusal_rate)) |>
   ggplot(aes(refusal_rate, category, fill = human_tier)) +
     geom_col(width = 0.75) +
@@ -1024,20 +1171,26 @@ HARM_CATEGORY_RATES |>
              y = Inf,
              label = paste0("Overall average: ", percent(overall_nc_rate, accuracy = 0.1)),
              hjust = -0.05,
-             vjust = 1.4,
+             vjust = -0.45,
              size = 3.1,
              colour = "grey25") +
     geom_text(aes(label = percent(refusal_rate, accuracy = 0.1)),
-              hjust = -0.08, size = 3.2) +
+              hjust = -0.08, size = 4.2) +
     scale_x_continuous(labels = percent_format(1),
                        limits = c(0, 1),
                        expand = expansion(mult = c(0, 0.08))) +
     scale_fill_manual(values = TIER_PALETTE, drop = FALSE) +
-    labs(x = "Overall in-voice Non-compliance rate", y = NULL, fill = "Human tier",
-         title = "Model refusal rates by harm category",
-         subtitle = "Bars are colored by human/normative harm grouping; dashed line marks the overall average") +
-    theme_minimal(base_size = 10) +
-    theme(legend.position = "bottom")
+    coord_cartesian(clip = "off") +
+    labs(x = "Overall in-voice Non-compliance rate", y = NULL, fill = "Human tier") +
+    theme_minimal(base_size = 18) +
+    theme(
+      legend.position = "bottom",
+      plot.margin = margin(t = 18, r = 8, b = 8, l = 8)
+    )
+
+p_harm_tier_rate
+
+ggsave("figs/harm_tier_refusal_rates.pdf", plot = p_harm_tier_rate, width = 7, height = 7, dpi = 300)
 ```
 
 ```{r harm-tier-summary}
@@ -1073,26 +1226,28 @@ l2_by_human_tier <- df_nc |>
     feature_group = factor(L2_FEATURE_GROUP[as.character(feature)], levels = L2_FEATURE_GROUP_LEVELS)
   )
 
-ggplot(l2_by_human_tier, aes(feature, tier, fill = rate)) +
+p_l2_by_human_tier <- ggplot(l2_by_human_tier, aes(feature, tier, fill = rate)) +
   geom_tile(colour = "white", linewidth = 0.45) +
-  geom_text(aes(label = percent(rate, accuracy = 1)), size = 3.2) +
+  geom_text(aes(label = percent(rate, accuracy = 1)), size = 4.2) +
   scale_fill_gradient(low = "#f7f7f7", high = "#08519c",
                       labels = percent_format(1), name = "Feature rate") +
   scale_x_discrete(position = "top", labels = L2_FEATURE_LABELS) +
   facet_grid(. ~ feature_group, scales = "free_x", space = "free_x") +
   labs(x = NULL, y = NULL,
-       title = "L2 feature use by human harm tier",
-       subtitle = "Pooled across models; tiers use the human/normative harm grouping",
        caption = paste0("n = ", nrow(df_nc), " in-voice refusals")) +
-  theme_minimal(base_size = 11) +
+  theme_minimal(base_size = 18) +
   theme(
-    axis.text.x = element_text(size = 9.5, hjust = 0.5, vjust = 0.5, lineheight = 0.9),
-    axis.text.y = element_text(size = 10),
+    axis.text.x = element_text(size = 14, hjust = 0.5, vjust = 0.5, lineheight = 0.9),
+    axis.text.y = element_text(size = 15),
     strip.text.x = element_blank(),
     strip.background.x = element_blank(),
     panel.spacing.x = unit(0.6, "lines"),
     legend.position = "bottom"
   )
+
+p_l2_by_human_tier
+
+ggsave("figs/l2_by_human_harm_tier.pdf", plot = p_l2_by_human_tier, width = 7, height = 7, dpi = 300)
 ```
 # Appendix: legacy / out-of-main-scope models
 
