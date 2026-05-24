@@ -945,6 +945,118 @@ p_l2_harm_difference
 ggsave("figs/l2_harm_difference_scale.pdf", plot = p_l2_harm_difference, width = 7, height = 7, dpi = 300)
 ```
 
+```{r l2-harm-difference-clustered, fig.height = 5.2, fig.width = 7}
+# Five groups from cutting the aggregated harm-type L2-form dendrogram at k = 5.
+# This is a visualization grouping, not a replacement for the human harm labels.
+HARM_RSA_CLUSTER <- c(
+  "Child Sexual Exploitation" = "Sexual / violent safety",
+  "Sex-Related Crimes"       = "Sexual / violent safety",
+  "Sexual Content"           = "Sexual / violent safety",
+  "Violent Crimes"           = "Sexual / violent safety",
+  "Indiscriminate Weapons"   = "Sexual / violent safety",
+  "Code Interpreter Abuse"   = "Procedural / boundary",
+  "Defamation"               = "Procedural / boundary",
+  "Elections"                = "Procedural / boundary",
+  "Hate"                     = "Procedural / boundary",
+  "Non-Violent Crimes"       = "Procedural / boundary",
+  "Privacy"                  = "Procedural / boundary",
+  "Intellectual Property"    = "Intellectual property",
+  "Specialized Advice"       = "Specialized advice",
+  "Suicide & Self-Harm"      = "Self-harm"
+)
+
+HARM_RSA_CLUSTER_LEVELS <- c(
+  "Sexual / violent safety",
+  "Procedural / boundary",
+  "Intellectual property",
+  "Specialized advice",
+  "Self-harm"
+)
+
+clustered_linguistic_features <- l2_cat_delta |>
+  filter(as.character(category) %in% names(HARM_RSA_CLUSTER),
+         !feature %in% c("explicit_nc", "implicit_nc")) |>
+  mutate(
+    harm_cluster = factor(HARM_RSA_CLUSTER[as.character(category)],
+                          levels = HARM_RSA_CLUSTER_LEVELS)
+  ) |>
+  group_by(harm_cluster, feature) |>
+  summarise(delta = mean(delta, na.rm = TRUE), .groups = "drop") |>
+  group_by(feature) |>
+  summarise(delta_sd = sd(delta, na.rm = TRUE), .groups = "drop") |>
+  arrange(desc(delta_sd)) |>
+  slice_head(n = 8) |>
+  pull(feature) |>
+  as.character()
+
+clustered_features <- c("explicit_nc", clustered_linguistic_features)
+
+l2_cat_delta_clustered <- l2_cat_delta |>
+  filter(as.character(category) %in% names(HARM_RSA_CLUSTER),
+         feature %in% clustered_features) |>
+  mutate(
+    harm_cluster = factor(HARM_RSA_CLUSTER[as.character(category)],
+                          levels = HARM_RSA_CLUSTER_LEVELS),
+    feature = factor(as.character(feature), levels = clustered_features),
+    feature_block = factor(
+      if_else(
+        as.character(feature) == "explicit_nc",
+        "Strategy",
+        "Form"
+      ),
+      levels = c("Strategy", "Form")
+    )
+  ) |>
+  group_by(harm_cluster, feature_block, feature) |>
+  summarise(
+    delta = mean(delta, na.rm = TRUE),
+    delta_colour = signed_log_delta(delta),
+    .groups = "drop"
+  )
+
+p_l2_harm_difference_clustered <- ggplot(
+  l2_cat_delta_clustered,
+  aes(feature, fct_rev(harm_cluster), fill = delta_colour)
+) +
+  geom_tile(colour = "white", linewidth = 0.35) +
+  geom_text(aes(label = percent(delta, accuracy = 1)), size = 3.4) +
+  facet_grid(. ~ feature_block, scales = "free_x", space = "free_x") +
+  scale_fill_gradient2(
+    low = "#b2182b",
+    mid = "#f7f7f7",
+    high = "#1b7837",
+    midpoint = 0,
+    limits = c(-delta_limit, delta_limit),
+    breaks = signed_log_delta(delta_breaks_raw),
+    labels = percent(delta_breaks_raw, accuracy = 1),
+    name = "Category -\nbaseline"
+  ) +
+  scale_x_discrete(position = "top", labels = L2_FEATURE_LABELS[clustered_features]) +
+  labs(x = NULL, y = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(size = 9.8, angle = 35, hjust = 0, vjust = 0.5, lineheight = 0.9),
+    axis.text.y = element_text(size = 10.5),
+    strip.text.x = element_text(size = 10.5, face = "bold", margin = margin(b = 4)),
+    strip.placement = "outside",
+    strip.background.x = element_blank(),
+    panel.spacing.x = unit(0.65, "lines"),
+    legend.position = "bottom"
+  ) +
+  guides(fill = guide_colourbar(
+    title.position = "left",
+    title.vjust = 0.5,
+    barwidth = unit(9, "cm"),
+    barheight = unit(0.45, "cm")
+  ))
+
+p_l2_harm_difference_clustered
+
+ggsave("figs/l2_harm_difference_clustered.pdf",
+       plot = p_l2_harm_difference_clustered,
+       width = 7, height = 5.2, dpi = 300)
+```
+
 ```{r l2-mod-cat-plot-1, fig.height = 18, fig.width = 11}
 ggplot(filter(l2_mod_cat, category %in% cat_part1),
        aes(feature, model, fill = rate)) +
