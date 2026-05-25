@@ -31,7 +31,11 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
 library(tidyverse)
 library(scales)
 library(knitr)
-library(kableExtra)
+if (requireNamespace("kableExtra", quietly = TRUE)) {
+  library(kableExtra)
+} else {
+  kable_styling <- function(kable_input, ...) kable_input
+}
 
 # ---- Load (mirrors refusal_analysis.Rmd setup) ------------------------------
 ANNOTATION_DIR <- file.path("..", "data", "annotations")
@@ -525,15 +529,80 @@ as_tibble(rsa_harm_ma, rownames = "h1") |>
 ```{r rsa-harm-mds, fig.height = 5, fig.width = 6}
 # 2D MDS layout on (1-r) distance
 d <- as.dist(1 - rsa_harm_ma)
-mds <- cmdscale(d, k = 2) |> as_tibble(rownames = "harm") |>
-  rename(x = V1, y = V2)
 
-ggplot(mds, aes(x, y, label = harm)) +
-  geom_point(size = 2.5, color = "steelblue") +
-  ggrepel::geom_text_repel(size = 3, max.overlaps = Inf) +
-  labs(x = "MDS dim 1", y = "MDS dim 2",
-       title = "Harm-type embedding from L2 form (MDS on model-aware RSA)") +
-  theme_minimal(base_size = 10)
+HARM_MDS_CLUSTER <- c(
+  "Child Sexual Exploitation" = "Sexual and violent harms",
+  "Sex-Related Crimes"       = "Sexual and violent harms",
+  "Sexual Content"           = "Sexual and violent harms",
+  "Violent Crimes"           = "Sexual and violent harms",
+  "Indiscriminate Weapons"   = "Sexual and violent harms",
+  "Code Interpreter Abuse"   = "Non-violent misuse",
+  "Defamation"               = "Non-violent misuse",
+  "Elections"                = "Non-violent misuse",
+  "Hate"                     = "Non-violent misuse",
+  "Non-Violent Crimes"       = "Non-violent misuse",
+  "Privacy"                  = "Non-violent misuse",
+  "Intellectual Property"    = "Intellectual property",
+  "Specialized Advice"       = "Specialized advice",
+  "Suicide & Self-Harm"      = "Suicide & self-harm"
+)
+
+HARM_MDS_CLUSTER_LEVELS <- c(
+  "Sexual and violent harms",
+  "Non-violent misuse",
+  "Intellectual property",
+  "Specialized advice",
+  "Suicide & self-harm"
+)
+
+HARM_MDS_CLUSTER_PALETTE <- c(
+  "Sexual and violent harms" = "#c0392b",
+  "Non-violent misuse"   = "#3b7f6b",
+  "Intellectual property"   = "#4c78a8",
+  "Specialized advice"      = "#d99a2b",
+  "Suicide & self-harm"     = "#7b6f8e"
+)
+
+mds <- cmdscale(d, k = 2) |> as_tibble(rownames = "harm") |>
+  rename(x = V1, y = V2) |>
+  mutate(
+    harm_cluster = factor(HARM_MDS_CLUSTER[harm],
+                          levels = HARM_MDS_CLUSTER_LEVELS)
+  )
+
+p_harm_mds_clustered <- ggplot(mds, aes(x, y, label = harm, colour = harm_cluster)) +
+  geom_point(size = 4.5) +
+  ggrepel::geom_text_repel(size = 5, max.overlaps = Inf, show.legend = FALSE) +
+  scale_colour_manual(values = HARM_MDS_CLUSTER_PALETTE, drop = FALSE) +
+  scale_x_continuous(expand = expansion(mult = c(0.18, 0.08))) +
+  scale_y_continuous(expand = expansion(mult = c(0.12, 0.10))) +
+  labs(x = "Dim 1", y = "Dim 2", colour = NULL) +
+  coord_cartesian(clip = "off") +
+  theme_minimal(base_size = 18) +
+  theme(
+    legend.position = "bottom",
+    legend.justification = "left",
+    legend.box.just = "left",
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 14),
+    legend.text = element_text(size = 13),
+    legend.key.size = unit(0.55, "cm"),
+    legend.margin = margin(t = 2, r = 0, b = 2, l = 0),
+    legend.box.margin = margin(t = 0, r = 0, b = 0, l = 0),
+    plot.margin = margin(t = 8, r = 20, b = 10, l = 24),
+    panel.grid.minor = element_blank()
+  ) +
+  guides(colour = guide_legend(
+    ncol = 2,
+    byrow = TRUE,
+    override.aes = list(size = 4)
+  ))
+
+p_harm_mds_clustered
+
+ggsave("figs/harm_type_mds_clustered.pdf",
+       plot = p_harm_mds_clustered,
+       width = 7, height = 5.5, dpi = 300)
 ```
 
 ## 6c. Aggregated vs model-aware: do they agree?

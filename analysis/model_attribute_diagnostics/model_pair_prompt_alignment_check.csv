@@ -1,0 +1,18 @@
+comparison,pair_id,n_a,n_b,n_joined,same_query,different_query,unique_ids_a,unique_ids_b
+size,llama-3.1-8b vs llama-3.1-70b,199,199,199,199,0,199,199
+size,qwen3-8b vs qwen3-32b,199,197,196,196,0,199,197
+size,qwen3-8b-reasoning vs qwen3-32b-reasoning,198,199,198,198,0,198,199
+reasoning,claude-opus-4.6 vs claude-opus-4.6-reasoning,194,194,194,194,0,194,194
+reasoning,gpt-5.3 vs gpt-5.3-reasoning,199,198,198,198,0,199,198
+reasoning,qwen3-8b vs qwen3-8b-reasoning,199,198,197,197,0,199,198
+reasoning,qwen3-32b vs qwen3-32b-reasoning,197,199,197,197,0,197,199
+temporal,gpt-4o vs gpt-5,200,198,198,198,0,200,198
+temporal,gpt-5 vs gpt-5.3,198,199,197,197,0,198,199
+temporal,gpt-4o vs gpt-5.3,200,199,199,199,0,200,199
+temporal,claude-sonnet-3.7 vs claude-sonnet-4.6,198,193,193,193,0,198,193
+closed_family,gpt-5.3 vs grok-4.20,199,181,181,181,0,199,181
+closed_family,claude-opus-4.6 vs gpt-5.3,194,199,194,194,0,194,199
+closed_family,claude-opus-4.6 vs gemini-2.5-pro,194,179,175,175,0,194,179
+closed_family,claude-opus-4.6 vs grok-4.20,194,181,179,179,0,194,181
+closed_family,gemini-2.5-pro vs gpt-5.3,179,199,179,179,0,179,199
+closed_family,gemini-2.5-pro vs grok-4.20,179,181,171,171,0,179,181

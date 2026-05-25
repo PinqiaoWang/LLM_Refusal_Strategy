@@ -1,0 +1,9 @@
+comparison,pair_id,mode,model,family,n_nc,apology,positive_alignment,solidarity,explanatory_preface,hedge
+temporal,gpt-4o vs gpt-5,Earlier,gpt-4o,OpenAI,157,0.9363057324840764,0,0.07006369426751592,0.006369426751592357,0
+temporal,gpt-4o vs gpt-5,Later,gpt-5,OpenAI,176,0.3977272727272727,0.011363636363636364,0.14204545454545456,0,0
+temporal,gpt-5 vs gpt-5.3,Earlier,gpt-5,OpenAI,176,0.3977272727272727,0.011363636363636364,0.14204545454545456,0,0
+temporal,gpt-5 vs gpt-5.3,Later,gpt-5.3,OpenAI,175,0.04,0.017142857142857144,0.07428571428571429,0,0
+temporal,gpt-4o vs gpt-5.3,Earlier,gpt-4o,OpenAI,157,0.9363057324840764,0,0.07006369426751592,0.006369426751592357,0
+temporal,gpt-4o vs gpt-5.3,Later,gpt-5.3,OpenAI,175,0.04,0.017142857142857144,0.07428571428571429,0,0
+temporal,claude-sonnet-3.7 vs claude-sonnet-4.6,Earlier,claude-sonnet-3.7,Anthropic,169,0.39644970414201186,0.25443786982248523,0.14792899408284024,0.1242603550295858,0
+temporal,claude-sonnet-3.7 vs claude-sonnet-4.6,Later,claude-sonnet-4.6,Anthropic,159,0,0.050314465408805034,0.14465408805031446,0.06918238993710692,0

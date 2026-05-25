@@ -1,0 +1,59 @@
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{llrrlp{4.5cm}}
+\toprule
+\textbf{Axis} & \textbf{Pair} & \textbf{$\Delta$ NC} & \textbf{Mean L2 diff.} & \textbf{Largest L2 shift} & \textbf{Direction} \\
+ & & \textbf{(pp)} & \textbf{(pp)} & & \\
+\midrule
+Size &
+Llama 3.1 8B $\rightarrow$ 70B &
+-14.6 & 2.4 &
+Alternative offer +6.3 pp &
+Large refusal-rate change, but small average change in refusal form. \\
+
+Size &
+Qwen3 8B $\rightarrow$ 32B &
+-4.4 & 8.7 &
+Apology +47.1 pp &
+Larger Qwen model uses much more apology; pattern is family-specific. \\
+
+Size &
+Qwen3 8B-reasoning $\rightarrow$ 32B-reasoning &
+-5.9 & 6.8 &
+Apology +44.6 pp &
+Same Qwen size pattern under reasoning mode. \\
+\addlinespace
+Reasoning &
+Claude Opus 4.6 standard $\rightarrow$ reasoning &
+-0.5 & 1.4 &
+Normative suggestion +4.9 pp &
+Limited observed change in refusal form. \\
+
+Reasoning &
+GPT-5.3 standard $\rightarrow$ reasoning &
++1.5 & 0.9 &
+Normative suggestion -4.0 pp &
+Limited observed change in refusal form. \\
+
+Reasoning &
+Qwen3 8B standard $\rightarrow$ reasoning &
+-0.7 & 1.7 &
+Alternative offer -5.1 pp &
+Limited observed change in refusal form. \\
+
+Reasoning &
+Qwen3 32B standard $\rightarrow$ reasoning &
+-2.2 & 4.0 &
+Normative suggestion +13.4 pp &
+Largest reasoning-mode shift; still pair-specific rather than general. \\
+\bottomrule
+\end{tabular}
+\caption{Diagnostic effect-size summary for size and reasoning comparisons.
+$\Delta$ NC is the second model minus the first model. Mean L2 difference is
+the mean absolute difference across Layer~2 feature rates. Values are
+percentage-point changes. These comparisons are descriptive rather than
+well-powered hypothesis tests.}
+\label{tab:size_reasoning_effect_direction}
+\end{table}
