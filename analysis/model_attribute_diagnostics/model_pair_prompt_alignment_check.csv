@@ -9,7 +9,9 @@ reasoning,qwen3-32b vs qwen3-32b-reasoning,197,199,197,197,0,197,199
 temporal,gpt-4o vs gpt-5,200,198,198,198,0,200,198
 temporal,gpt-5 vs gpt-5.3,198,199,197,197,0,198,199
 temporal,gpt-4o vs gpt-5.3,200,199,199,199,0,200,199
-temporal,claude-sonnet-3.7 vs claude-sonnet-4.6,198,193,193,193,0,198,193
+temporal,claude-opus-3 vs claude-sonnet-3.7,196,198,194,2,192,196,198
+temporal,claude-sonnet-3.7 vs claude-opus-4.6,198,194,194,194,0,198,194
+temporal,claude-opus-3 vs claude-opus-4.6,196,194,190,2,188,196,194
 closed_family,gpt-5.3 vs grok-4.20,199,181,181,181,0,199,181
 closed_family,claude-opus-4.6 vs gpt-5.3,194,199,194,194,0,194,199
 closed_family,claude-opus-4.6 vs gemini-2.5-pro,194,179,175,175,0,194,179

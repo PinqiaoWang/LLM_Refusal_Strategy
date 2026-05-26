@@ -45,8 +45,8 @@ MODEL_ORDER <- c(
   # OpenAI: legacy → modern
   #"gpt-4-turbo", 
   "gpt-4o", "gpt-5", "gpt-5.3", "gpt-5.3-reasoning",
-  # Anthropic: legacy → modern (Opus 3 added 2026-05-25 after API access granted)
-  "claude-opus-3", "claude-sonnet-3.7", "claude-sonnet-4.6", "claude-opus-4.6", "claude-opus-4.6-reasoning",
+  # Anthropic: legacy → modern (Sonnet 4.6 removed from main scope)
+  "claude-opus-3", "claude-sonnet-3.7", "claude-opus-4.6", "claude-opus-4.6-reasoning",
   # Google
   "gemini-2.5-pro",
   # xAI
@@ -64,7 +64,7 @@ MODEL_FAMILY <- c(
   # "gpt-4-turbo" = "OpenAI",
   "gpt-4o" = "OpenAI", "gpt-5" = "OpenAI", "gpt-5.3" = "OpenAI", "gpt-5.3-reasoning" = "OpenAI",
   "claude-opus-3" = "Anthropic",
-  "claude-sonnet-3.7" = "Anthropic", "claude-sonnet-4.6" = "Anthropic",
+  "claude-sonnet-3.7" = "Anthropic",
   "claude-opus-4.6" = "Anthropic", "claude-opus-4.6-reasoning" = "Anthropic",
   "gemini-2.5-pro" = "Google", "grok-4.20" = "xAI",
   # "llama-3-70b-instruct" = "Meta",
@@ -83,13 +83,15 @@ REASONING_PAIRS <- tribble(
 )
 
 # ---- Load -------------------------------------------------------------------
-# Older models (gpt-4-turbo, llama-3-70b-instruct, mistral-7b-instruct-v0.1)
-# were collected for temporal-coverage analysis but are excluded from the main
-# corpus: they sit awkwardly in the corpus (different generation, weaker
-# instruction-following, distinct release-era), and the within-family
-# old-vs-new contrasts were better served by the gpt-4o/gpt-5 and
-# sonnet-3.7/sonnet-4.6 pairs already in scope. Data files remain on disk.
-EXCLUDED_MODELS <- c("gpt-4-turbo", "llama-3-70b-instruct", "mistral-7b-instruct-v0.1")
+# Older/out-of-main-scope models are kept on disk but excluded from the main
+# corpus. Claude Sonnet 4.6 is also excluded from the current main analysis so
+# the Anthropic sequence is Opus 3, Sonnet 3.7, Opus 4.6, and Opus 4.6 reasoning.
+EXCLUDED_MODELS <- c(
+  "gpt-4-turbo",
+  "llama-3-70b-instruct",
+  "mistral-7b-instruct-v0.1",
+  "claude-sonnet-4.6"
+)
 
 read_judged <- function(path) {
   model <- str_replace(basename(path), "^responses_(.*)\\.judged\\.csv$", "\\1")
@@ -751,15 +753,22 @@ ggplot(l1_tbl, aes(model, prop, fill = layer1)) +
   scale_fill_manual(values = l1_pal) +
   coord_flip() +
   labs(x = "Model", y = "Proportion", fill = "Layer 1") +
-  theme_minimal(base_size = 18) + 
+  guides(fill = guide_legend(ncol = 2, byrow = TRUE)) +
+  theme_minimal(base_size = 20) +
   theme(
     legend.position = "bottom",
-    ) + 
-  facet_grid(family ~., scales="free", space="free")
-
-# TODO: Fix facet labeller and move axis left
+    legend.justification = "left",
+    legend.box.just = "left",
+    legend.box.margin = margin(t = 2, r = 0, b = 2, l = -120),
+    legend.margin = margin(0),
+    strip.text.y = element_blank(),
+    strip.background = element_blank(),
+    plot.margin = margin(t = 6, r = 10, b = 6, l = 6)
+  ) +
+  facet_grid(family ~., scales = "free", space = "free")
 
 ggsave("figs/layer1_balanced_cohort.pdf", width=8, height=7)
+ggsave("figs/layer1.pdf", width=7, height=7)
 
 ```
 
