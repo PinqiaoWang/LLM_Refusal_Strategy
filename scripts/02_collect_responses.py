@@ -105,6 +105,15 @@ OPENROUTER_MODEL_CONFIGS = {
     },
 }
 
+# Direct Anthropic API (not OpenRouter). Used for models gated to a specific
+# account, e.g. Claude 3 Opus access granted 2026-05-25.
+ANTHROPIC_MODEL_CONFIGS = {
+    "claude-opus-3": {
+        "label": "Claude 3 Opus",
+        "model_id": "claude-3-opus-20240229",
+    },
+}
+
 
 def get_openrouter_client():
     from openai import OpenAI
@@ -242,6 +251,146 @@ def query_openrouter_model(
     }
 
 
+def get_anthropic_client():
+    import anthropic
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise RuntimeError("Set ANTHROPIC_API_KEY before running --mode anthropic.")
+    return anthropic.Anthropic(api_key=api_key)
+
+
+def query_anthropic_model(
+    client,
+    model_key: str,
+    prompt_record: dict,
+    max_tokens: Optional[int],
+    temperature: float,
+) -> dict:
+    """Call Anthropic Messages API directly. Emits the same row schema as
+    `query_openrouter_model` so downstream judging / analysis treats the rows
+    identically. `provider` is set to "anthropic-direct" to distinguish from
+    OpenRouter-routed Anthropic rows (which may be Bedrock-backed)."""
+    config = ANTHROPIC_MODEL_CONFIGS[model_key]
+    response = client.messages.create(
+        model=config["model_id"],
+        max_tokens=max_tokens if max_tokens is not None else 4096,
+        temperature=temperature,
+        messages=[{"role": "user", "content": prompt_record["query"]}],
+    )
+    raw_response = response.model_dump()
+    # Concatenate all text blocks; non-text blocks (e.g. thinking) are ignored
+    response_text = "".join(
+        block.get("text", "") for block in raw_response.get("content", [])
+        if block.get("type") == "text"
+    )
+    usage = raw_response.get("usage") or {}
+
+    return {
+        "final_sample_id": prompt_record.get("final_sample_id"),
+        "source": prompt_record.get("source"),
+        "candidate_id": prompt_record.get("candidate_id"),
+        "query": prompt_record["query"],
+        "primary_llama_guard_category": prompt_record.get("primary_llama_guard_category"),
+        "primary_llama_guard_category_name": prompt_record.get("primary_llama_guard_category_name"),
+        "llama_guard_category_codes": prompt_record.get("llama_guard_category_codes", []),
+        "llama_guard_category_names": prompt_record.get("llama_guard_category_names", []),
+        "model_key": model_key,
+        "model_label": config["label"],
+        "model_id": config["model_id"],
+        "reasoning": False,
+        "response": response_text,
+        "finish_reason": raw_response.get("stop_reason"),
+        "native_finish_reason": raw_response.get("stop_reason"),
+        "completion_tokens": usage.get("output_tokens"),
+        "total_tokens": (usage.get("input_tokens") or 0) + (usage.get("output_tokens") or 0),
+        "provider": "anthropic-direct",
+        "raw_response": raw_response,
+    }
+
+
+def collect_anthropic_responses(args) -> None:
+    client = get_anthropic_client()
+
+    if args.model:
+        if args.model not in ANTHROPIC_MODEL_CONFIGS:
+            raise ValueError(f"Unknown Anthropic model key: {args.model}")
+        model_keys = [args.model]
+    else:
+        model_keys = list(ANTHROPIC_MODEL_CONFIGS.keys())
+
+    prompt_records = load_sampled_prompts(
+        prompts_path=Path(args.prompts),
+        categories=args.category,
+        max_prompts=args.max_prompts,
+        one_per_category=args.one_per_category,
+    )
+    print(f"Selected {len(prompt_records)} prompts")
+
+    for model_key in model_keys:
+        config = ANTHROPIC_MODEL_CONFIGS[model_key]
+        output_path = Path(args.output_dir) / f"responses_{model_key}.json"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        results = load_existing_results(output_path)
+        completed_keys = {
+            get_result_key(result)
+            for result in results
+            if not result.get("error") and result.get("response")
+        }
+        print(f"Loaded {len(results)} existing rows from {output_path}")
+
+        print(f"\nCollecting {config['label']} ({config['model_id']})")
+        for prompt_record in prompt_records:
+            category = prompt_record.get("primary_llama_guard_category")
+            result_key = (
+                model_key,
+                prompt_record.get("final_sample_id"),
+                prompt_record.get("query"),
+            )
+            if result_key in completed_keys:
+                print(f"  Prompt {prompt_record.get('final_sample_id')} [{category}] SKIP existing")
+                continue
+            print(f"  Prompt {prompt_record.get('final_sample_id')} [{category}]")
+            try:
+                result = query_anthropic_model(
+                    client=client,
+                    model_key=model_key,
+                    prompt_record=prompt_record,
+                    max_tokens=args.max_tokens,
+                    temperature=args.temperature,
+                )
+                print(f"    OK: {result['response'][:120]!r}")
+            except Exception as exc:
+                result = {
+                    "final_sample_id": prompt_record.get("final_sample_id"),
+                    "source": prompt_record.get("source"),
+                    "candidate_id": prompt_record.get("candidate_id"),
+                    "query": prompt_record.get("query"),
+                    "primary_llama_guard_category": category,
+                    "primary_llama_guard_category_name": prompt_record.get("primary_llama_guard_category_name"),
+                    "llama_guard_category_codes": prompt_record.get("llama_guard_category_codes", []),
+                    "llama_guard_category_names": prompt_record.get("llama_guard_category_names", []),
+                    "model_key": model_key,
+                    "model_label": config["label"],
+                    "model_id": config["model_id"],
+                    "reasoning": False,
+                    "error": str(exc),
+                    "provider": "anthropic-direct",
+                }
+                print(f"    ERROR: {exc}")
+
+            results.append(result)
+            if not result.get("error"):
+                completed_keys.add(get_result_key(result))
+            save_results(results, output_path)
+            openrouter_responses_json_to_csv(str(output_path),
+                                             str(output_path.with_suffix(".csv")))
+            print(f"    Saved progress: {len(results)} rows")
+            time.sleep(args.delay)
+
+        print(f"Saved {len(results)} responses to {output_path}")
+
+
 def collect_openrouter_responses(args) -> None:
     client = get_openrouter_client()
 
@@ -357,8 +506,9 @@ def collect_openrouter_responses(args) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Collect model responses")
-    parser.add_argument("--mode", choices=["api", "local", "openrouter"], default="openrouter",
-                        help="API models, local vLLM models, or OpenRouter models")
+    parser.add_argument("--mode", choices=["api", "local", "openrouter", "anthropic"],
+                        default="openrouter",
+                        help="API models, local vLLM models, OpenRouter models, or direct Anthropic API")
     parser.add_argument("--model", default=None,
                         help="Specific model name")
     parser.add_argument("--all", action="store_true",
@@ -393,12 +543,12 @@ def main() -> None:
                         help="Number of WildChat samples")
     args = parser.parse_args()
     if args.prompts is None:
-        if args.mode == "openrouter":
+        if args.mode in ("openrouter", "anthropic"):
             args.prompts = str(DEFAULT_SAMPLED_PROMPTS_PATH)
         else:
             args.prompts = str(DEFAULT_BENCHMARK_PROMPTS_PATH)
     if args.output_dir is None:
-        if args.mode == "openrouter":
+        if args.mode in ("openrouter", "anthropic"):
             args.output_dir = str(DEFAULT_OPENROUTER_RESPONSES_DIR)
         else:
             args.output_dir = str(DEFAULT_RESPONSES_DIR)
@@ -420,6 +570,10 @@ def main() -> None:
 
     if args.mode == "openrouter":
         collect_openrouter_responses(args)
+        return
+
+    if args.mode == "anthropic":
+        collect_anthropic_responses(args)
         return
 
     from src.model_inference import collect_responses

@@ -45,8 +45,8 @@ MODEL_ORDER <- c(
   # OpenAI: legacy → modern
   #"gpt-4-turbo", 
   "gpt-4o", "gpt-5", "gpt-5.3", "gpt-5.3-reasoning",
-  # Anthropic: legacy → modern
-  "claude-sonnet-3.7", "claude-sonnet-4.6", "claude-opus-4.6", "claude-opus-4.6-reasoning",
+  # Anthropic: legacy → modern (Opus 3 added 2026-05-25 after API access granted)
+  "claude-opus-3", "claude-sonnet-3.7", "claude-sonnet-4.6", "claude-opus-4.6", "claude-opus-4.6-reasoning",
   # Google
   "gemini-2.5-pro",
   # xAI
@@ -63,6 +63,7 @@ MODEL_ORDER <- c(
 MODEL_FAMILY <- c(
   # "gpt-4-turbo" = "OpenAI",
   "gpt-4o" = "OpenAI", "gpt-5" = "OpenAI", "gpt-5.3" = "OpenAI", "gpt-5.3-reasoning" = "OpenAI",
+  "claude-opus-3" = "Anthropic",
   "claude-sonnet-3.7" = "Anthropic", "claude-sonnet-4.6" = "Anthropic",
   "claude-opus-4.6" = "Anthropic", "claude-opus-4.6-reasoning" = "Anthropic",
   "gemini-2.5-pro" = "Google", "grok-4.20" = "xAI",

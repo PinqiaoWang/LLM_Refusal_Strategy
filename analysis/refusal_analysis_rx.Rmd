@@ -14,6 +14,7 @@ output:
 ---
 
 ```{r setup, include = FALSE}
+
 knitr::opts_chunk$set(
   echo = TRUE, warning = FALSE, message = FALSE,
   fig.width = 10, fig.height = 6, dpi = 110
@@ -93,8 +94,8 @@ MODEL_ORDER <- c(
   # OpenAI: legacy → modern
   #"gpt-4-turbo", 
   "gpt-4o", "gpt-5", "gpt-5.3", "gpt-5.3-reasoning",
-  # Anthropic: legacy → modern
-  "claude-sonnet-3.7", "claude-sonnet-4.6", "claude-opus-4.6", "claude-opus-4.6-reasoning",
+  # Anthropic: legacy → modern (Opus 3 added 2026-05-25 via direct Anthropic API)
+  "claude-opus-3", "claude-sonnet-3.7", "claude-sonnet-4.6", "claude-opus-4.6", "claude-opus-4.6-reasoning",
   # Google
   "gemini-2.5-pro",
   # xAI
@@ -111,6 +112,7 @@ MODEL_ORDER <- c(
 MODEL_FAMILY <- c(
   # "gpt-4-turbo" = "OpenAI",
   "gpt-4o" = "OpenAI", "gpt-5" = "OpenAI", "gpt-5.3" = "OpenAI", "gpt-5.3-reasoning" = "OpenAI",
+  "claude-opus-3" = "Anthropic",
   "claude-sonnet-3.7" = "Anthropic", "claude-sonnet-4.6" = "Anthropic",
   "claude-opus-4.6" = "Anthropic", "claude-opus-4.6-reasoning" = "Anthropic",
   "gemini-2.5-pro" = "Google", "grok-4.20" = "xAI",
@@ -432,7 +434,7 @@ family_legend <- tibble(
 
 ggplot(l2_tbl, aes(feature, model)) +
   geom_tile(aes(fill = tile_fill), colour = "white", linewidth = 0.4) +
-  geom_text(aes(label = percent(rate, accuracy = 1)), size = 4.2, vjust = 0.5) +
+  geom_text(aes(label = percent(rate, accuracy = 1)), size = 3.8, vjust = 0.5) +
   geom_point(
     data = family_legend,
     aes(feature, model, colour = family),
@@ -447,13 +449,13 @@ ggplot(l2_tbl, aes(feature, model)) +
   labs(x = NULL, y = NULL,
        # title = "Overall L2 feature distribution by model"
        ) +
-  theme_minimal(base_size = 32) +
+  theme_minimal(base_size = 24) +
   theme(
     plot.title = element_text(face = "bold", size = 20),
-    axis.text.x = element_text(size = 12, angle = 0, hjust = 0.5, vjust = 0.5, lineheight = 0.9),
-    axis.text.y = element_text(size = 14),
-    legend.title = element_text(size = 15, face = "bold"),
-    legend.text = element_text(size = 14),
+    axis.text.x = element_text(size = 10.5, angle = 0, hjust = 0.5, vjust = 0.5, lineheight = 0.9),
+    axis.text.y = element_text(size = 12.5),
+    legend.title = element_text(size = 13.5, face = "bold"),
+    legend.text = element_text(size = 12.5),
     legend.position = "bottom",
     strip.placement = "outside",
     strip.text.y.left = element_blank(),
@@ -626,6 +628,7 @@ MODEL_RELEASE_DATES <- tribble(
   "gpt-4o",              "OpenAI",     "2024-05-13", "OpenAI GPT-4o announcement",
   "gpt-5",               "OpenAI",     "2025-08-07", "OpenAI GPT-5 announcement",
   "gpt-5.3",             "OpenAI",     "2026-03-03", "OpenAI GPT-5.3 Instant announcement",
+  "claude-opus-3",       "Anthropic",  "2024-03-04", "Anthropic Claude 3 Opus announcement",
   "claude-sonnet-3.7",   "Anthropic",  "2025-02-24", "Anthropic Claude 3.7 Sonnet announcement",
   "claude-opus-4.6",     "Anthropic",  "2026-02-05", "Anthropic Claude Opus 4.6 announcement",
   "claude-sonnet-4.6",   "Anthropic",  "2026-02-17", "Anthropic Claude Sonnet 4.6 announcement"
@@ -646,25 +649,19 @@ apology_timeline <- df_nc |>
 apology_events <- apology_timeline |>
   arrange(release_date, family) |>
   mutate(
-    raw_x = as.numeric(release_date - min(release_date)) / 120,
-    expand_start = as.Date("2026-02-01"),
-    expand_anchor = as.numeric(expand_start - min(release_date)) / 120,
-    event_x = if_else(release_date >= expand_start,
-                      expand_anchor + as.numeric(release_date - expand_start) / 8,
-                      raw_x),
-    x_label = format(release_date, "%b %d\n%Y"),
     point_label = as.character(model),
     label_x = case_when(
-      as.character(model) == "gpt-4o" ~ event_x,
-      as.character(model) == "gpt-5" ~ event_x + 0.22,
-      as.character(model) == "gpt-5.3" ~ event_x + 0.36,
-      as.character(model) == "claude-sonnet-3.7" ~ event_x - 1.0,
-      as.character(model) == "claude-opus-4.6" ~ event_x + 0.46,
-      as.character(model) == "claude-sonnet-4.6" ~ event_x,
-      TRUE ~ event_x
+      as.character(model) == "claude-opus-3" ~ release_date + lubridate::days(15),
+      as.character(model) == "gpt-4o" ~ release_date,
+      as.character(model) == "gpt-5" ~ release_date + lubridate::days(30),
+      as.character(model) == "gpt-5.3" ~ release_date + lubridate::days(45),
+      as.character(model) == "claude-sonnet-3.7" ~ release_date - lubridate::days(120),
+      as.character(model) == "claude-opus-4.6" ~ release_date + lubridate::days(55),
+      as.character(model) == "claude-sonnet-4.6" ~ release_date,
+      TRUE ~ release_date
     ),
     label_y = case_when(
-      # as.character(model) == "gpt-4o" ~ pmax(apology_rate - 0.10, 0.04),
+      as.character(model) == "claude-opus-3" ~ apology_rate + 0.05,
       as.character(model) == "gpt-4o" ~ 0.98,
       as.character(model) == "gpt-5" ~ apology_rate + 0.08,
       as.character(model) == "gpt-5.3" ~ apology_rate + 0.08,
@@ -679,8 +676,8 @@ apology_decay_endpoints <- apology_events |>
   group_by(family) |>
   arrange(release_date, .by_group = TRUE) |>
   summarise(
-    x_start = first(event_x),
-    x_end = last(event_x),
+    x_start = first(release_date),
+    x_end = last(release_date),
     y_start = first(apology_rate),
     y_end = last(apology_rate),
     change_label = paste0(if_else(y_end - y_start < 0, "", "+"),
@@ -688,7 +685,7 @@ apology_decay_endpoints <- apology_events |>
     .groups = "drop"
   )
 
-ggplot(apology_events, aes(event_x, apology_rate, colour = family)) +
+ggplot(apology_events, aes(release_date, apology_rate, colour = family)) +
   geom_line(aes(group = family), linewidth = 0.9) +
   geom_segment(
     data = apology_decay_endpoints,
@@ -705,7 +702,7 @@ ggplot(apology_events, aes(event_x, apology_rate, colour = family)) +
     linewidth = 0.65
   ) +
   geom_point(size = 3.6) +
-  geom_segment(aes(x = label_x, xend = event_x, y = label_y, yend = apology_rate),
+  geom_segment(aes(x = label_x, xend = release_date, y = label_y, yend = apology_rate),
                colour = "black", linewidth = 0.35, show.legend = FALSE) +
   geom_text(aes(x = label_x, y = label_y, label = point_label),
             colour = "black", size = 4.2, lineheight = 0.9, show.legend = FALSE) +
@@ -718,23 +715,24 @@ ggplot(apology_events, aes(event_x, apology_rate, colour = family)) +
     fontface = "bold",
     colour = "black"
   ) +
-  scale_x_continuous(
-    breaks = apology_events$event_x,
-    labels = apology_events$x_label,
-    expand = expansion(mult = c(0.08, 0.18))
+  scale_x_date(
+    date_breaks = "6 months",
+    date_labels = "%b %Y",
+    expand = expansion(mult = c(0.05, 0.1))
   ) +
   scale_y_continuous(labels = percent_format(1),
                      expand = expansion(mult = c(0, 0.05))) +
   scale_colour_manual(values = c(OpenAI = "#1b9e77", Anthropic = "#d95f02"),
                       labels = c(OpenAI = "OpenAI", Anthropic = "Anthropic")) +
   coord_cartesian(ylim = c(0, 1), clip = "off") +
-  labs(x = "Release day",
+  labs(x = NULL,
        y = "Apology rate", colour = NULL) +
   theme_classic(base_size = 18) +
   theme(
     legend.position = c(0.94, 0.88),
     legend.background = element_blank(),
-    plot.margin = margin(t = 10, r = 35, b = 10, l = 10)
+    plot.margin = margin(t = 10, r = 35, b = 10, l = 10),
+    panel.grid.major.x = element_line(colour = "grey88", linewidth = 0.3)
   )
 
 ggsave("figs/apology_decay_timeline.pdf", width = 7, height = 7, dpi = 300)
@@ -943,125 +941,6 @@ p_l2_harm_difference <- ggplot(l2_cat_delta, aes(feature, category, fill = delta
 p_l2_harm_difference
 
 ggsave("figs/l2_harm_difference_scale.pdf", plot = p_l2_harm_difference, width = 7, height = 7, dpi = 300)
-```
-
-```{r l2-harm-difference-clustered, fig.height = 5.2, fig.width = 7}
-# Five groups from cutting the aggregated harm-type L2-form dendrogram at k = 5.
-# This is a visualization grouping, not a replacement for the human harm labels.
-HARM_RSA_CLUSTER <- c(
-  "Child Sexual Exploitation" = "Sexual and violent harms",
-  "Sex-Related Crimes"       = "Sexual and violent harms",
-  "Sexual Content"           = "Sexual and violent harms",
-  "Violent Crimes"           = "Sexual and violent harms",
-  "Indiscriminate Weapons"   = "Sexual and violent harms",
-  "Code Interpreter Abuse"   = "Non-violent misuse",
-  "Defamation"               = "Non-violent misuse",
-  "Elections"                = "Non-violent misuse",
-  "Hate"                     = "Non-violent misuse",
-  "Non-Violent Crimes"       = "Non-violent misuse",
-  "Privacy"                  = "Non-violent misuse",
-  "Intellectual Property"    = "Intellectual property",
-  "Specialized Advice"       = "Specialized advice",
-  "Suicide & Self-Harm"      = "Suicide & self-harm"
-)
-
-HARM_RSA_CLUSTER_LEVELS <- c(
-  "Sexual and violent harms",
-  "Non-violent misuse",
-  "Intellectual property",
-  "Specialized advice",
-  "Suicide & self-harm"
-)
-
-clustered_feature_rates <- df_nc |>
-  filter(primary_llama_guard_category_name %in% names(HARM_RSA_CLUSTER)) |>
-  mutate(
-    harm_cluster = factor(HARM_RSA_CLUSTER[primary_llama_guard_category_name],
-                          levels = HARM_RSA_CLUSTER_LEVELS)
-  ) |>
-  select(harm_cluster, all_of(L2_FEATURES)) |>
-  pivot_longer(-harm_cluster, names_to = "feature", values_to = "value") |>
-  filter(!is.na(value)) |>
-  group_by(harm_cluster, feature) |>
-  summarise(rate = mean(value, na.rm = TRUE), n = n(), .groups = "drop") |>
-  group_by(feature) |>
-  mutate(
-    feature_baseline = mean(df_nc[[first(feature)]], na.rm = TRUE),
-    delta = rate - feature_baseline,
-    delta_colour = signed_log_delta(delta)
-  ) |>
-  ungroup()
-
-clustered_linguistic_features <- clustered_feature_rates |>
-  filter(!feature %in% c("explicit_nc", "implicit_nc", "alternative_offer")) |>
-  group_by(feature) |>
-  summarise(delta_sd = sd(delta, na.rm = TRUE), .groups = "drop") |>
-  arrange(desc(delta_sd)) |>
-  slice_head(n = 5) |>
-  pull(feature) |>
-  as.character()
-
-clustered_features <- c("explicit_nc", clustered_linguistic_features)
-
-l2_cat_delta_clustered <- clustered_feature_rates |>
-  filter(feature %in% clustered_features) |>
-  mutate(
-    feature = factor(as.character(feature), levels = clustered_features),
-    feature_block = factor(
-      if_else(
-        as.character(feature) == "explicit_nc",
-        "Strategy",
-        "Form"
-      ),
-      levels = c("Strategy", "Form")
-    )
-  )
-
-p_l2_harm_difference_clustered <- ggplot(
-  l2_cat_delta_clustered,
-  aes(feature, fct_rev(harm_cluster), fill = delta_colour)
-) +
-  geom_tile(colour = "white", linewidth = 0.35) +
-  geom_text(aes(label = percent(rate, accuracy = 1)), size = 4.4) +
-  facet_grid(. ~ feature_block, scales = "free_x", space = "free_x") +
-  scale_fill_gradient2(
-    low = "#b2182b",
-    mid = "#f7f7f7",
-    high = "#1b7837",
-    midpoint = 0,
-    limits = c(-delta_limit, delta_limit),
-    breaks = signed_log_delta(delta_breaks_raw),
-    labels = percent(delta_breaks_raw, accuracy = 1),
-    name = "Deviation from average"
-  ) +
-  scale_x_discrete(position = "top", labels = L2_FEATURE_LABELS[clustered_features]) +
-  labs(x = NULL, y = NULL) +
-  theme_minimal(base_size = 18) +
-  theme(
-    axis.text.x = element_text(size = 13, angle = 35, hjust = 0, vjust = 0.5, lineheight = 0.9),
-    axis.text.y = element_text(size = 14),
-    strip.text.x = element_text(size = 14, face = "bold", margin = margin(b = 5)),
-    strip.placement = "outside",
-    strip.background.x = element_blank(),
-    panel.spacing.x = unit(0.65, "lines"),
-    legend.position = "bottom",
-    legend.justification = "center",
-    legend.box.just = "center",
-    legend.title = element_text(size = 13),
-    legend.text = element_text(size = 12)
-  ) +
-  guides(fill = guide_colourbar(
-    title.position = "top",
-    title.hjust = 0.5,
-    barwidth = unit(6.5, "cm"),
-    barheight = unit(0.45, "cm")
-  ))
-
-p_l2_harm_difference_clustered
-
-ggsave("figs/l2_harm_difference_clustered.pdf",
-       plot = p_l2_harm_difference_clustered,
-       width = 7, height = 5.2, dpi = 300)
 ```
 
 ```{r l2-mod-cat-plot-1, fig.height = 18, fig.width = 11}
