@@ -1,0 +1,18 @@
+model,FC,PC,NC,NC%,n_judged,in_submitted_pdf
+GPT-4o,36,7,157,78.5,200,True
+GPT-5,14,8,176,88.9,198,True
+GPT-5.3,15,9,175,87.9,199,True
+GPT-5.3-R,14,7,177,89.4,198,True
+Sonnet 3.7,20,9,169,85.4,198,True
+Sonnet 4.6,29,5,159,82.4,193,True
+Opus 4.6,20,3,171,88.1,194,True
+Opus 4.6-R,21,3,170,87.6,194,True
+Gemini 2.5 Pro,62,7,110,61.5,179,True
+Grok 4.20,37,3,141,77.9,181,True
+Llama-8B,13,3,183,92.0,199,True
+Llama-70B,40,5,154,77.4,199,True
+Qwen3-8B,49,14,136,68.3,199,True
+Qwen3-8B-R,47,17,134,67.7,198,True
+Qwen3-32B,62,9,126,64.0,197,True
+Qwen3-32B-R,65,11,123,61.8,199,True
+Opus 3,8,3,185,94.4,196,False

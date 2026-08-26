@@ -1,0 +1,31 @@
+judge,family,level,feature,accuracy,kappa,n
+GPT-5.5 non-reasoning,OpenAI,layer0,,0.95,0.8562,100
+GPT-5.5 non-reasoning,OpenAI,layer1,,0.9221,0.8285,77
+GPT-5.5 non-reasoning,OpenAI,layer2,explicit_nc,0.974,0.7861,77
+GPT-5.5 non-reasoning,OpenAI,layer2,implicit_nc,0.974,0.7861,77
+GPT-5.5 non-reasoning,OpenAI,layer2,apology,0.974,0.9245,77
+GPT-5.5 non-reasoning,OpenAI,layer2,hedge,1.0,1.0,77
+GPT-5.5 non-reasoning,OpenAI,layer2,explanatory_preface,0.961,0.6484,77
+GPT-5.5 non-reasoning,OpenAI,layer2,positive_alignment,0.974,0.7861,77
+GPT-5.5 non-reasoning,OpenAI,layer2,solidarity,0.987,0.9262,77
+GPT-5.5 non-reasoning,OpenAI,layer2,negative_stance,0.9091,0.7905,77
+GPT-5.5 non-reasoning,OpenAI,layer2,executed_alternative,0.8442,0.6292,77
+GPT-5.5 non-reasoning,OpenAI,layer2,alternative_offer,0.8312,0.6635,77
+GPT-5.5 non-reasoning,OpenAI,layer2,normative_suggestion,0.6753,0.3945,77
+GPT-5.5 non-reasoning,OpenAI,layer2,statement_of_principle,0.9481,0.3063,77
+GPT-5.5 non-reasoning,OpenAI,layer2,role_based,0.974,0.8429,77
+Claude Opus 4.6,Anthropic,layer0,,0.949,0.8521,98
+Claude Opus 4.6,Anthropic,layer1,,0.8947,0.7926,76
+Claude Opus 4.6,Anthropic,layer2,explicit_nc,0.9867,0.8819,75
+Claude Opus 4.6,Anthropic,layer2,implicit_nc,0.9867,0.8819,75
+Claude Opus 4.6,Anthropic,layer2,apology,0.9733,0.9239,75
+Claude Opus 4.6,Anthropic,layer2,hedge,1.0,1.0,75
+Claude Opus 4.6,Anthropic,layer2,explanatory_preface,0.9467,0.5763,75
+Claude Opus 4.6,Anthropic,layer2,positive_alignment,0.9733,0.7368,75
+Claude Opus 4.6,Anthropic,layer2,solidarity,0.9733,0.8428,75
+Claude Opus 4.6,Anthropic,layer2,negative_stance,0.9467,0.88,75
+Claude Opus 4.6,Anthropic,layer2,executed_alternative,0.8933,0.7222,75
+Claude Opus 4.6,Anthropic,layer2,alternative_offer,0.92,0.8264,75
+Claude Opus 4.6,Anthropic,layer2,normative_suggestion,0.76,0.4503,75
+Claude Opus 4.6,Anthropic,layer2,statement_of_principle,0.96,0.6479,75
+Claude Opus 4.6,Anthropic,layer2,role_based,0.9867,0.9158,75

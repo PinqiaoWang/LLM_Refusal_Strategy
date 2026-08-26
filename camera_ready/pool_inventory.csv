@@ -1,0 +1,15 @@
+category,current,sorrybench_remaining,lmsys_remaining,ceiling,need_for_target,reachable
+Child Sexual Exploitation,25,0,3392,3417,0,True
+Code Interpreter Abuse,10,0,9,19,10,False
+Defamation,12,11,85,108,8,True
+Elections,10,0,6,16,10,False
+Hate,25,39,7735,7799,0,True
+Indiscriminate Weapons,10,2,6,18,10,False
+Intellectual Property,11,3,11,25,9,True
+Non-Violent Crimes,10,90,32,132,10,True
+Privacy,10,0,0,10,10,False
+Sex-Related Crimes,16,0,589,605,4,True
+Sexual Content,25,12,7472,7509,0,True
+Specialized Advice,10,21,6,37,10,True
+Suicide & Self-Harm,15,3,195,213,5,True
+Violent Crimes,11,40,223,274,9,True

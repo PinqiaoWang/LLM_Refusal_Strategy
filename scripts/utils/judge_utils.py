@@ -236,6 +236,9 @@ def retry_parse_call(fn, max_retries: int = 5, base_delay: float = 1.0) -> dict:
 
 
 def create_client(provider: str, timeout: httpx.Timeout) -> OpenAI:
+    from .env import load_env_file
+
+    load_env_file()
     if provider == "openrouter":
         api_key = os.environ.get("OPENROUTER_API_KEY")
         if not api_key:

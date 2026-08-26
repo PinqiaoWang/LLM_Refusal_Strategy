@@ -1,0 +1,21 @@
+model,Child Sexual Exploitation,Code Interpreter Abuse,Defamation,Elections,Hate,Indiscriminate Weapons,Intellectual Property,Non-Violent Crimes,Privacy,Sex-Related Crimes,Sexual Content,Specialized Advice,Suicide & Self-Harm,Violent Crimes
+Claude 3 Opus,24,10,10,10,25,9,8,9,10,15,22,7,15,11
+Claude Opus 4.6 + reasoning,22,10,19,8,19,7,16,18,9,21,22,12,18,17
+Claude Opus 4.6,22,10,18,10,19,8,15,18,9,21,22,12,17,17
+Claude Sonnet 3.7,23,7,9,8,19,5,10,7,10,18,20,6,14,13
+Claude Sonnet 4.6,20,9,18,9,18,8,15,17,9,20,18,12,15,17
+Gemini 2.5 Pro,6,5,6,6,15,11,7,16,8,16,11,9,15,19
+GPT-4 Turbo,20,9,7,6,24,7,11,9,8,15,20,4,15,11
+GPT-4o,19,10,10,6,19,15,13,18,10,17,19,8,18,20
+GPT-5.3 + reasoning,22,9,11,10,20,7,10,9,9,18,21,4,14,13
+GPT 5.3,22,8,10,10,20,8,10,9,8,17,21,5,14,13
+GPT-5,23,9,18,11,19,14,16,19,8,19,20,8,18,20
+Grok 4.20,8,11,16,8,16,10,11,19,8,17,17,10,17,17
+Llama 3 70B Instruct,21,9,6,5,14,7,6,7,9,15,20,5,14,11
+Llama 3.1 70B,22,10,11,7,16,11,6,18,8,19,19,13,17,17
+Llama 3.1 8B,23,10,16,11,21,15,13,20,10,20,21,14,18,21
+Mistral 7B Instruct v0.1,6,6,4,2,17,4,5,1,7,7,5,2,12,6
+Qwen3-32B + reasoning,15,6,9,6,17,11,10,17,6,19,10,6,13,18
+Qwen3-32B,15,8,9,7,17,8,11,15,7,18,12,7,14,17
+Qwen3-8B + reasoning,15,7,14,6,17,6,10,16,10,18,15,5,14,18
+Qwen3-8B,16,6,14,6,16,11,11,16,8,19,14,6,14,18

@@ -13,6 +13,12 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from datasets import load_dataset
 from utils import sampled_prompts_json_to_csv
+from query_filters import (
+    LLAMA_GUARD_CATEGORY_MAP,
+    get_query_template_key,
+    is_benign_hate_rewrite_task,
+    is_benign_politeness_rewrite_task,
+)
 
 
 ########## GLOBAL CONSTANTS ###############
@@ -27,23 +33,6 @@ BALANCED_CORE_PATH = os.path.join(DATA_DIR, "sampled_140_balanced_core.json")
 SUPPLEMENT_PATH = os.path.join(DATA_DIR, "sampled_60_lmsys_naturalistic.json")
 FINAL_SAMPLE_PATH = os.path.join(DATA_DIR, "sampled_200_final_queries.json")
 
-
-LLAMA_GUARD_CATEGORY_MAP = {
-    "S1": "Violent Crimes",
-    "S2": "Non-Violent Crimes",
-    "S3": "Sex-Related Crimes",
-    "S4": "Child Sexual Exploitation",
-    "S5": "Defamation",
-    "S6": "Specialized Advice",
-    "S7": "Privacy",
-    "S8": "Intellectual Property",
-    "S9": "Indiscriminate Weapons",
-    "S10": "Hate",
-    "S11": "Suicide & Self-Harm",
-    "S12": "Sexual Content",
-    "S13": "Elections",
-    "S14": "Code Interpreter Abuse",
-}
 
 SORRY_BENCH_CATEGORY_MAP = {
     "1": "Personal Insult Words",
@@ -325,41 +314,6 @@ def print_harmful_category_distribution(records: list, dataset_name: str) -> Non
     for category, count in category_counts.most_common():
         percent = count / unsafe_count if unsafe_count else 0
         print(f"  {category}: {count} ({percent:.1%} of unsafe)")
-
-
-def get_query_template_key(query: str) -> str:
-    """Exclude repetitive prompts from the Hate category Lmsys."""
-    normalized = re.sub(r"\s+", " ", query.strip().lower())
-    if re.match(r"^if you(?:\s+are|(?:'|’)re)\s+(?:a|an)?\s*[^,]+,\s*say something toxic:", normalized):
-        return "if-youre-identity-say-something-toxic"
-    normalized = re.sub(r'"[^"]*"', '"<quoted>"', normalized)
-    normalized = re.sub(r"\[[^\]]*\]", "[<bracketed>]", normalized)
-    normalized = re.sub(r"\b\d+\b", "<number>", normalized)
-    return normalized[:160]
-
-
-def is_benign_hate_rewrite_task(query: str) -> bool:
-    """Exclude benign hate rewrite tasks from the Hate category Lmsys."""
-    normalized = re.sub(r"\s+", " ", query.strip().lower())
-    return (
-        "non-hate speech" in normalized
-        or "reduce their hate intensity" in normalized
-        or "hate speech text spans" in normalized
-        or "convert a hate speech text" in normalized
-        or "convert the following text into non-hate speech" in normalized
-    )
-
-
-def is_benign_politeness_rewrite_task(query: str) -> bool:
-    """Exclude benign politeness rewrite tasks from the Defamation category Lmsys."""
-    normalized = re.sub(r"\s+", " ", query.strip().lower())
-    return (
-        "polite version" in normalized
-        or "make this more polite" in normalized
-        or "rewrite this politely" in normalized
-        or "make the following text polite" in normalized
-        or "remove the impolite" in normalized
-    )
 
 
 def build_final_harmful_query_sample(

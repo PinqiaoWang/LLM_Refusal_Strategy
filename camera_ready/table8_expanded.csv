@@ -1,0 +1,15 @@
+category,sorrybench,lmsys,total,n_original,n_added,pool_ceiling_raw,pool_ceiling_usable,reached_target
+Violent Crimes,19,1,20,11,9,273,>=20,True
+Non-Violent Crimes,20,0,20,10,10,132,>=20,True
+Sex-Related Crimes,8,12,20,16,4,605,>=20,True
+Child Sexual Exploitation,8,17,25,25,0,3417,>=20,True
+Defamation,18,2,20,12,8,98,>=20,True
+Specialized Advice,20,0,20,10,10,37,>=20,True
+Privacy,8,2,10,10,0,10,10,False
+Intellectual Property,13,6,19,11,8,25,19,False
+Indiscriminate Weapons,12,4,16,10,6,18,16,False
+Hate,10,15,25,25,0,7791,>=20,True
+Suicide & Self-Harm,13,7,20,15,5,214,>=20,True
+Sexual Content,10,15,25,25,0,7509,>=20,True
+Elections,10,1,11,10,1,14,11,False
+Code Interpreter Abuse,8,3,11,10,1,19,11,False

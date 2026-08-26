@@ -4,6 +4,7 @@ Step 2: Query LLMs and collect responses on benchmark prompts.
 """
 
 import argparse
+import datetime
 import json
 import os
 import sys
@@ -20,6 +21,14 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 sys.path.insert(0, str(REPO_ROOT))
 from utils import openrouter_responses_json_to_csv
+
+# Model responses routinely contain emoji and other non-cp1252 characters. On
+# Windows the console encoding makes printing one raise UnicodeEncodeError, and
+# because the progress print sat inside the per-prompt try/except, a
+# successfully collected response was discarded and stored as an error instead.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
 
 OPENROUTER_MODEL_CONFIGS = {
     "llama-3.1-8b": {
@@ -118,6 +127,9 @@ ANTHROPIC_MODEL_CONFIGS = {
 def get_openrouter_client():
     from openai import OpenAI
 
+    from utils.env import load_env_file
+
+    load_env_file()
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
         raise RuntimeError("Set OPENROUTER_API_KEY before running OpenRouter collection.")
@@ -220,6 +232,7 @@ def query_openrouter_model(
     if max_tokens is not None:
         request_kwargs["max_completion_tokens"] = max_tokens
 
+    requested_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
     response = client.chat.completions.create(**request_kwargs)
     raw_response = response.model_dump()
     choices = raw_response.get("choices") or [{}]
@@ -247,6 +260,13 @@ def query_openrouter_model(
         "completion_tokens": usage.get("completion_tokens"),
         "total_tokens": usage.get("total_tokens"),
         "provider": raw_response.get("provider"),
+        # Model-snapshot metadata. The camera-ready has to report which
+        # server-side version actually answered, not just which model was
+        # requested, because the original 200 prompts were collected months
+        # earlier and provider-side weights/filters may have changed since.
+        "collected_at": requested_at,
+        "served_model": raw_response.get("model"),
+        "generation_id": raw_response.get("id"),
         "raw_response": raw_response,
     }
 
@@ -359,7 +379,6 @@ def collect_anthropic_responses(args) -> None:
                     max_tokens=args.max_tokens,
                     temperature=args.temperature,
                 )
-                print(f"    OK: {result['response'][:120]!r}")
             except Exception as exc:
                 result = {
                     "final_sample_id": prompt_record.get("final_sample_id"),
@@ -378,6 +397,10 @@ def collect_anthropic_responses(args) -> None:
                     "provider": "anthropic-direct",
                 }
                 print(f"    ERROR: {exc}")
+            else:
+                # Printed outside the try: a console-encoding failure here must
+                # never be mistaken for a failed API call.
+                print(f"    OK: {result['response'][:120]!r}")
 
             results.append(result)
             if not result.get("error"):
@@ -472,7 +495,6 @@ def collect_openrouter_responses(args) -> None:
                     max_tokens=args.max_tokens,
                     temperature=args.temperature,
                 )
-                print(f"    OK: {result['response'][:120]!r}")
             except Exception as exc:
                 result = {
                     "final_sample_id": prompt_record.get("final_sample_id"),
@@ -490,18 +512,25 @@ def collect_openrouter_responses(args) -> None:
                     "error": str(exc),
                 }
                 print(f"    ERROR: {exc}")
+            else:
+                # Printed outside the try: a console-encoding failure here must
+                # never be mistaken for a failed API call.
+                print(f"    OK: {result['response'][:120]!r}")
 
             results.append(result)
             if not result.get("error"):
                 completed_keys.add(get_result_key(result))
             save_results(results, output_path)
-            output_csv_path = output_path.with_suffix(".csv")
-            openrouter_responses_json_to_csv(str(output_path), str(output_csv_path))
             print(f"    Saved progress: {len(results)} rows")
-            print(f"    Saved CSV progress to {output_csv_path}")
             time.sleep(args.delay)
 
+        # The CSV is a derived view of the JSON; regenerating it after every
+        # prompt re-read and rewrote the whole file each time, which is slow
+        # over a few thousand records. Once per model is enough.
+        output_csv_path = output_path.with_suffix(".csv")
+        openrouter_responses_json_to_csv(str(output_path), str(output_csv_path))
         print(f"Saved {len(results)} responses to {output_path}")
+        print(f"Saved CSV to {output_csv_path}")
 
 
 def main() -> None:
@@ -529,6 +558,10 @@ def main() -> None:
                         help="Path to model config for api/local modes")
     parser.add_argument("--output-dir", default=None,
                         help="Output directory for responses")
+    parser.add_argument("--run-id", default=None,
+                        help="Collection run label. Writes to "
+                             "data/responses/openrouter/expanded_<run-id>/ so a "
+                             "re-collection never overwrites an earlier run.")
     parser.add_argument("--output", default=None,
                         help="Output JSON path for OpenRouter mode")
     parser.add_argument("--max-tokens", type=int, default=None,
@@ -549,7 +582,10 @@ def main() -> None:
             args.prompts = str(DEFAULT_BENCHMARK_PROMPTS_PATH)
     if args.output_dir is None:
         if args.mode in ("openrouter", "anthropic"):
-            args.output_dir = str(DEFAULT_OPENROUTER_RESPONSES_DIR)
+            if args.run_id:
+                args.output_dir = str(DEFAULT_OPENROUTER_RESPONSES_DIR / f"expanded_{args.run_id}")
+            else:
+                args.output_dir = str(DEFAULT_OPENROUTER_RESPONSES_DIR)
         else:
             args.output_dir = str(DEFAULT_RESPONSES_DIR)
 

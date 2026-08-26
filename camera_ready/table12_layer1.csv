@@ -1,0 +1,18 @@
+model,Bare,Capacity-based,Policy-based,Ethics-based,n_nc,in_submitted_pdf
+GPT-4o,145,0,0,12,157,True
+GPT-5,40,1,6,129,176,True
+GPT-5.3,16,1,6,152,175,True
+GPT-5.3-R,26,1,8,142,177,True
+Sonnet 3.7,2,7,10,150,169,True
+Sonnet 4.6,12,1,4,142,159,True
+Opus 4.6,7,1,6,157,171,True
+Opus 4.6-R,3,3,9,155,170,True
+Gemini 2.5 Pro,5,0,23,82,110,True
+Grok 4.20,14,0,19,108,141,True
+Llama-8B,140,0,5,38,183,True
+Llama-70B,105,2,19,28,154,True
+Qwen3-8B,9,1,8,118,136,True
+Qwen3-8B-R,9,0,8,117,134,True
+Qwen3-32B,23,1,7,95,126,True
+Qwen3-32B-R,11,0,10,102,123,True
+Opus 3,4,3,9,169,185,False
