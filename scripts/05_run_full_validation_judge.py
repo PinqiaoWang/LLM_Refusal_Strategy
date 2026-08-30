@@ -2,6 +2,7 @@
 """Run the calibrated LLM judge on unlabeled validation response records."""
 
 import argparse
+import json
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -24,6 +25,40 @@ from utils.judge_utils import (
 
 
 DEFAULT_OUTPUT = DATA_DIR / "judge_validation_200_predictions.json"
+
+
+def load_checkpoint(path: Path) -> List[Dict]:
+    if not path.exists():
+        return []
+    records = []
+    lines = path.read_text(encoding="utf-8").splitlines()
+    for index, line in enumerate(lines):
+        if not line.strip():
+            continue
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError:
+            if index != len(lines) - 1:
+                raise
+            print(f"WARNING: ignoring an incomplete final checkpoint line in {path}")
+    return records
+
+
+def append_checkpoint(path: Path, record: Dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def merge_attempts(records: List[Dict]) -> List[Dict]:
+    """Deduplicate canonical and checkpoint rows, preferring a valid attempt."""
+    merged = {}
+    for record in records:
+        key = (record_id(record), record.get("judge_prompt_sha256"))
+        previous = merged.get(key)
+        if previous is None or previous.get("parse_error") or not record.get("parse_error"):
+            merged[key] = record
+    return list(merged.values())
 
 
 def validate_records(records: List[Dict], input_path: Path) -> None:
@@ -126,7 +161,9 @@ def main() -> None:
     validate_records(records, input_path)
 
     output_path = Path(args.output)
-    existing = load_records(output_path) if output_path.exists() else []
+    checkpoint_path = output_path.with_name(output_path.name + ".checkpoint.jsonl")
+    canonical = load_records(output_path) if output_path.exists() else []
+    existing = merge_attempts(canonical + load_checkpoint(checkpoint_path))
     prompt = build_prompt(
         args.max_query_chars,
         args.max_response_chars,
@@ -169,8 +206,7 @@ def main() -> None:
             }
             results.append(result)
             done_ids.add(rid)
-            write_json(output_path, results)
-            write_csv(output_path.with_suffix(".csv"), results)
+            append_checkpoint(checkpoint_path, result)
             continue
         try:
             judgment = judge_record(
@@ -205,10 +241,14 @@ def main() -> None:
         results.append(result)
         if not result.get("parse_error"):
             done_ids.add(rid)
-        write_json(output_path, results)
-        write_csv(output_path.with_suffix(".csv"), results)
+        append_checkpoint(checkpoint_path, result)
         time.sleep(args.delay)
 
+    # Compact the append-only checkpoint only after the model pass completes.
+    # If either final write fails, the journal remains available for resume.
+    write_json(output_path, results)
+    write_csv(output_path.with_suffix(".csv"), results)
+    checkpoint_path.unlink(missing_ok=True)
     print(f"Saved {len(results)} predictions -> {output_path}")
     print(f"Saved CSV -> {output_path.with_suffix('.csv')}")
 

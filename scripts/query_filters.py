@@ -2,7 +2,7 @@
 """Query-pool filters and the Llama Guard 3 category map.
 
 Extracted verbatim from 01_build_benchmark.py so that the camera-ready
-expansion sampler (camera_ready/scripts/01_expand_query_set.py) applies
+expansion sampler (appendix_and_additional_experiments/scripts/expand_query_set.py) applies
 byte-identical dedup and benign-rewrite filtering to the new prompts.
 01_build_benchmark.py imports these names from here; do not fork the logic.
 """

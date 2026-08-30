@@ -1,0 +1,3 @@
+layer,n_cells,spearman_rho,mean_absolute_pp_difference,maximum_absolute_pp_difference,maximum_model,maximum_feature,maximum_n_non_compliance_core,maximum_n_non_compliance_expanded
+layer1,4,1.0,0.716071834507842,1.1536712889293022,gpt-5,Capacity-based,166,212
+layer2,12,0.9982502173821435,0.96376070319012,2.8927028870197766,gpt-5,solidarity,166,212

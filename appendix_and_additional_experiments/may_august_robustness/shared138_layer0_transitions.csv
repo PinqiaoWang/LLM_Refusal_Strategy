@@ -1,0 +1,99 @@
+model,may_layer0,august_layer0,count,rate_among_valid_pairs
+claude-opus-4.6,Full compliance,Full compliance,10,0.07575757575757576
+claude-opus-4.6,Full compliance,Non-compliance,1,0.007575757575757576
+claude-opus-4.6,Non-compliance,Full compliance,4,0.030303030303030304
+claude-opus-4.6,Non-compliance,Non-compliance,112,0.8484848484848485
+claude-opus-4.6,Non-compliance,Partial compliance,2,0.015151515151515152
+claude-opus-4.6,Partial compliance,Partial compliance,3,0.022727272727272728
+claude-opus-4.6-reasoning,Full compliance,Full compliance,14,0.10606060606060606
+claude-opus-4.6-reasoning,Non-compliance,Full compliance,9,0.06818181818181818
+claude-opus-4.6-reasoning,Non-compliance,Non-compliance,105,0.7954545454545454
+claude-opus-4.6-reasoning,Non-compliance,Partial compliance,1,0.007575757575757576
+claude-opus-4.6-reasoning,Partial compliance,Full compliance,1,0.007575757575757576
+claude-opus-4.6-reasoning,Partial compliance,Partial compliance,2,0.015151515151515152
+claude-sonnet-4.6,Full compliance,Full compliance,16,0.12598425196850394
+claude-sonnet-4.6,Full compliance,Non-compliance,1,0.007874015748031496
+claude-sonnet-4.6,Non-compliance,Non-compliance,106,0.8346456692913385
+claude-sonnet-4.6,Partial compliance,Full compliance,1,0.007874015748031496
+claude-sonnet-4.6,Partial compliance,Non-compliance,1,0.007874015748031496
+claude-sonnet-4.6,Partial compliance,Partial compliance,2,0.015748031496062992
+gemini-2.5-pro,Full compliance,Full compliance,35,0.2777777777777778
+gemini-2.5-pro,Full compliance,Non-compliance,1,0.007936507936507936
+gemini-2.5-pro,Full compliance,Partial compliance,1,0.007936507936507936
+gemini-2.5-pro,Non-compliance,Full compliance,2,0.015873015873015872
+gemini-2.5-pro,Non-compliance,Non-compliance,77,0.6111111111111112
+gemini-2.5-pro,Non-compliance,Partial compliance,4,0.031746031746031744
+gemini-2.5-pro,Partial compliance,Full compliance,1,0.007936507936507936
+gemini-2.5-pro,Partial compliance,Non-compliance,1,0.007936507936507936
+gemini-2.5-pro,Partial compliance,Partial compliance,4,0.031746031746031744
+gpt-4o,Full compliance,Full compliance,26,0.18840579710144928
+gpt-4o,Full compliance,Partial compliance,2,0.014492753623188406
+gpt-4o,Non-compliance,Full compliance,5,0.036231884057971016
+gpt-4o,Non-compliance,Non-compliance,100,0.7246376811594203
+gpt-4o,Partial compliance,Full compliance,1,0.007246376811594203
+gpt-4o,Partial compliance,Partial compliance,4,0.028985507246376812
+gpt-5,Full compliance,Full compliance,6,0.045112781954887216
+gpt-5,Full compliance,Partial compliance,2,0.015037593984962405
+gpt-5,Non-compliance,Full compliance,3,0.022556390977443608
+gpt-5,Non-compliance,Non-compliance,112,0.8421052631578947
+gpt-5,Non-compliance,Partial compliance,2,0.015037593984962405
+gpt-5,Partial compliance,Non-compliance,2,0.015037593984962405
+gpt-5,Partial compliance,Partial compliance,6,0.045112781954887216
+grok-4.20,Full compliance,Full compliance,16,0.125
+grok-4.20,Full compliance,Non-compliance,2,0.015625
+grok-4.20,Full compliance,Partial compliance,2,0.015625
+grok-4.20,Non-compliance,Full compliance,3,0.0234375
+grok-4.20,Non-compliance,Non-compliance,101,0.7890625
+grok-4.20,Non-compliance,Partial compliance,1,0.0078125
+grok-4.20,Partial compliance,Non-compliance,1,0.0078125
+grok-4.20,Partial compliance,Partial compliance,2,0.015625
+llama-3.1-70b,Full compliance,Full compliance,24,0.17518248175182483
+llama-3.1-70b,Full compliance,Non-compliance,5,0.0364963503649635
+llama-3.1-70b,Full compliance,Partial compliance,1,0.0072992700729927005
+llama-3.1-70b,Non-compliance,Full compliance,3,0.021897810218978103
+llama-3.1-70b,Non-compliance,Non-compliance,99,0.7226277372262774
+llama-3.1-70b,Non-compliance,Partial compliance,1,0.0072992700729927005
+llama-3.1-70b,Partial compliance,Non-compliance,2,0.014598540145985401
+llama-3.1-70b,Partial compliance,Partial compliance,2,0.014598540145985401
+llama-3.1-8b,Full compliance,Full compliance,6,0.043795620437956206
+llama-3.1-8b,Full compliance,Non-compliance,3,0.021897810218978103
+llama-3.1-8b,Non-compliance,Full compliance,10,0.072992700729927
+llama-3.1-8b,Non-compliance,Non-compliance,113,0.8248175182481752
+llama-3.1-8b,Non-compliance,Partial compliance,3,0.021897810218978103
+llama-3.1-8b,Partial compliance,Non-compliance,1,0.0072992700729927005
+llama-3.1-8b,Partial compliance,Partial compliance,1,0.0072992700729927005
+qwen3-32b,Full compliance,Full compliance,25,0.1865671641791045
+qwen3-32b,Full compliance,Non-compliance,6,0.04477611940298507
+qwen3-32b,Full compliance,Partial compliance,3,0.022388059701492536
+qwen3-32b,Non-compliance,Full compliance,9,0.06716417910447761
+qwen3-32b,Non-compliance,Non-compliance,79,0.5895522388059702
+qwen3-32b,Non-compliance,Partial compliance,3,0.022388059701492536
+qwen3-32b,Partial compliance,Full compliance,1,0.007462686567164179
+qwen3-32b,Partial compliance,Non-compliance,4,0.029850746268656716
+qwen3-32b,Partial compliance,Partial compliance,4,0.029850746268656716
+qwen3-32b-reasoning,Full compliance,Full compliance,30,0.22058823529411764
+qwen3-32b-reasoning,Full compliance,Non-compliance,6,0.04411764705882353
+qwen3-32b-reasoning,Full compliance,Partial compliance,2,0.014705882352941176
+qwen3-32b-reasoning,Non-compliance,Full compliance,6,0.04411764705882353
+qwen3-32b-reasoning,Non-compliance,Non-compliance,80,0.5882352941176471
+qwen3-32b-reasoning,Non-compliance,Partial compliance,4,0.029411764705882353
+qwen3-32b-reasoning,Partial compliance,Full compliance,1,0.007352941176470588
+qwen3-32b-reasoning,Partial compliance,Non-compliance,2,0.014705882352941176
+qwen3-32b-reasoning,Partial compliance,Partial compliance,5,0.03676470588235294
+qwen3-8b,Full compliance,Full compliance,22,0.16176470588235295
+qwen3-8b,Full compliance,Non-compliance,2,0.014705882352941176
+qwen3-8b,Full compliance,Partial compliance,4,0.029411764705882353
+qwen3-8b,Non-compliance,Full compliance,9,0.0661764705882353
+qwen3-8b,Non-compliance,Non-compliance,87,0.6397058823529411
+qwen3-8b,Non-compliance,Partial compliance,2,0.014705882352941176
+qwen3-8b,Partial compliance,Full compliance,3,0.022058823529411766
+qwen3-8b,Partial compliance,Partial compliance,7,0.051470588235294115
+qwen3-8b-reasoning,Full compliance,Full compliance,19,0.13970588235294118
+qwen3-8b-reasoning,Full compliance,Non-compliance,2,0.014705882352941176
+qwen3-8b-reasoning,Full compliance,Partial compliance,5,0.03676470588235294
+qwen3-8b-reasoning,Non-compliance,Full compliance,7,0.051470588235294115
+qwen3-8b-reasoning,Non-compliance,Non-compliance,86,0.6323529411764706
+qwen3-8b-reasoning,Non-compliance,Partial compliance,3,0.022058823529411766
+qwen3-8b-reasoning,Partial compliance,Full compliance,5,0.03676470588235294
+qwen3-8b-reasoning,Partial compliance,Non-compliance,3,0.022058823529411766
+qwen3-8b-reasoning,Partial compliance,Partial compliance,6,0.04411764705882353

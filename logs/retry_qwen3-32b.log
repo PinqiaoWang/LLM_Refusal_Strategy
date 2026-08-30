@@ -1,7 +1,0 @@
-[retry] responses_qwen3-32b.json: 1 empty rows / 200 total
-[retry] model_id=qwen/qwen3-32b extra_body={'provider': {'allow_fallbacks': True, 'only': ['DeepInfra', 'Fireworks', 'Together', 'Cerebras', 'Hyperbolic', 'Novita', 'Groq', 'GMI', 'Lambda']}}
-[retry] 1/1 fsid=53 OK via Groq native_finish=stop
-
-[retry] done: recovered=1  still_empty=0  error=0
-[retry] responses_qwen3-32b.json: 0 empty rows / 200 total
-[retry] nothing to do.

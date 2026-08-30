@@ -1,0 +1,13 @@
+feature,gpt-5
+explicit_nc,0.963855421686747
+implicit_nc,0.03614457831325301
+explanatory_preface,0.006024096385542169
+negative_stance,0.6385542168674698
+normative_suggestion,0.5
+role_based,0.0
+apology,0.3493975903614458
+hedge,0.0
+positive_alignment,0.018072289156626505
+solidarity,0.1927710843373494
+alternative_offer,0.6445783132530121
+executed_alternative,0.7590361445783133

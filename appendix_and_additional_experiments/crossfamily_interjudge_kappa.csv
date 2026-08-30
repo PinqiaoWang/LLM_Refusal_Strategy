@@ -1,0 +1,16 @@
+label,interjudge_kappa,claude_human_kappa
+Layer 0 action,0.873,0.848
+Layer 1 rationale,0.863,0.808
+Explicit non-compliance,0.916,0.882
+Implicit non-compliance,0.916,0.882
+Apology / regret,1.000,0.959
+Hedge / epistemic softener,0.000,0.000
+Explanatory preface,-0.020,-0.019
+Positive alignment,0.661,0.489
+Solidarity / empathy,0.842,0.926
+Negative stance,0.742,0.880
+Executed alternative,0.798,0.780
+Alternative offer,0.863,0.942
+Normative suggestion,0.408,0.237
+Statement of principle,0.707,1.000
+Role-based self-positioning,0.551,0.647

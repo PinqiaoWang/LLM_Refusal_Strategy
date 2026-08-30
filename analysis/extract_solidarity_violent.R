@@ -4,7 +4,7 @@ ANNOTATION_DIR <- file.path("data", "annotations")
 PROMPT_SHA256  <- "238bb923037bb4126bef041f202fd6547e328aa62f4f61f06b8f63d784891fb1"
 EXCLUDED_MODELS <- c(
   "gpt-4-turbo", "llama-3-70b-instruct",
-  "mistral-7b-instruct-v0.1", "claude-sonnet-4.6"
+  "mistral-7b-instruct-v0.1", "claude-opus-3"
 )
 SEXUAL_VIOLENT_HARMS <- c(
   "Child Sexual Exploitation", "Sex-Related Crimes", "Sexual Content",

@@ -23,7 +23,7 @@ L2_FEATURES <- c(
 
 MODEL_ORDER <- c(
   "gpt-4o", "gpt-5", "gpt-5.3", "gpt-5.3-reasoning",
-  "claude-opus-3", "claude-sonnet-3.7",
+  "claude-sonnet-3.7", "claude-sonnet-4.6",
   "claude-opus-4.6", "claude-opus-4.6-reasoning",
   "gemini-2.5-pro", "grok-4.20",
   "llama-3.1-8b", "llama-3.1-70b",
@@ -36,8 +36,8 @@ MODEL_FAMILY <- c(
   "gpt-5" = "OpenAI",
   "gpt-5.3" = "OpenAI",
   "gpt-5.3-reasoning" = "OpenAI",
-  "claude-opus-3" = "Anthropic",
   "claude-sonnet-3.7" = "Anthropic",
+  "claude-sonnet-4.6" = "Anthropic",
   "claude-opus-4.6" = "Anthropic",
   "claude-opus-4.6-reasoning" = "Anthropic",
   "gemini-2.5-pro" = "Google",
@@ -55,8 +55,8 @@ MODEL_ACCESS <- c(
   "gpt-5" = "closed/proprietary",
   "gpt-5.3" = "closed/proprietary",
   "gpt-5.3-reasoning" = "closed/proprietary",
-  "claude-opus-3" = "closed/proprietary",
   "claude-sonnet-3.7" = "closed/proprietary",
+  "claude-sonnet-4.6" = "closed/proprietary",
   "claude-opus-4.6" = "closed/proprietary",
   "claude-opus-4.6-reasoning" = "closed/proprietary",
   "gemini-2.5-pro" = "closed/proprietary",
@@ -73,7 +73,7 @@ EXCLUDED_MODELS <- c(
   "gpt-4-turbo",
   "llama-3-70b-instruct",
   "mistral-7b-instruct-v0.1",
-  "claude-sonnet-4.6"
+  "claude-opus-3"
 )
 
 read_judged <- function(path) {
@@ -221,9 +221,9 @@ temporal_pairs <- tribble(
   "gpt-4o", "gpt-5",
   "gpt-5", "gpt-5.3",
   "gpt-4o", "gpt-5.3",
-  "claude-opus-3", "claude-sonnet-3.7",
-  "claude-sonnet-3.7", "claude-opus-4.6",
-  "claude-opus-3", "claude-opus-4.6"
+  "claude-sonnet-3.7", "claude-sonnet-4.6",
+  "claude-sonnet-4.6", "claude-opus-4.6",
+  "claude-sonnet-3.7", "claude-opus-4.6"
 )
 
 closed_family_pairs <- expand_grid(

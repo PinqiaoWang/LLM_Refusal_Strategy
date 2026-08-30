@@ -94,8 +94,8 @@ MODEL_ORDER <- c(
   # OpenAI: legacy → modern
   #"gpt-4-turbo", 
   "gpt-4o", "gpt-5", "gpt-5.3", "gpt-5.3-reasoning",
-  # Anthropic: legacy → modern (Sonnet 4.6 removed from main scope)
-  "claude-opus-3", "claude-sonnet-3.7", "claude-opus-4.6", "claude-opus-4.6-reasoning",
+  # Anthropic: standard and reasoning variants
+  "claude-sonnet-3.7", "claude-sonnet-4.6", "claude-opus-4.6", "claude-opus-4.6-reasoning",
   # Google
   "gemini-2.5-pro",
   # xAI
@@ -112,8 +112,7 @@ MODEL_ORDER <- c(
 MODEL_FAMILY <- c(
   # "gpt-4-turbo" = "OpenAI",
   "gpt-4o" = "OpenAI", "gpt-5" = "OpenAI", "gpt-5.3" = "OpenAI", "gpt-5.3-reasoning" = "OpenAI",
-  "claude-opus-3" = "Anthropic",
-  "claude-sonnet-3.7" = "Anthropic",
+  "claude-sonnet-3.7" = "Anthropic", "claude-sonnet-4.6" = "Anthropic",
   "claude-opus-4.6" = "Anthropic", "claude-opus-4.6-reasoning" = "Anthropic",
   "gemini-2.5-pro" = "Google", "grok-4.20" = "xAI",
   # "llama-3-70b-instruct" = "Meta",
@@ -149,13 +148,13 @@ REASONING_PAIRS <- tribble(
 
 # ---- Load -------------------------------------------------------------------
 # Older/out-of-main-scope models are kept on disk but excluded from the main
-# corpus. Claude Sonnet 4.6 is also excluded from the current main analysis so
-# the Anthropic sequence is Opus 3, Sonnet 3.7, Opus 4.6, and Opus 4.6 reasoning.
+# corpus. Claude Opus 3 is excluded because it was collected on a different
+# 200-prompt manifest from the matched May panel.
 EXCLUDED_MODELS <- c(
   "gpt-4-turbo",
   "llama-3-70b-instruct",
   "mistral-7b-instruct-v0.1",
-  "claude-sonnet-4.6"
+  "claude-opus-3"
 )
 
 read_judged <- function(path) {
@@ -620,9 +619,11 @@ l2_extremes |>
 ## 4.3 Apology decay across OpenAI and Claude releases
 
 This view focuses only on the `apology` feature among in-voice refusals. The
-timeline uses public release dates where available. Reasoning variants are
-omitted from the main plot because they are mode/configuration variants of the
-same underlying release rather than separate model generations.
+timeline uses public release dates where available. To keep the Anthropic
+series prompt-matched, Claude Opus 3, Sonnet 3.7, and Sonnet 4.6 are restricted
+to the 135 queries shared by all three models. The OpenAI series uses each
+model's complete May sample. Reasoning variants are omitted because they are
+mode/configuration variants rather than separate model generations.
 
 ```{r apology-decay-timeline, fig.height = 4.2, fig.width = 8.8}
 MODEL_RELEASE_DATES <- tribble(
@@ -632,19 +633,79 @@ MODEL_RELEASE_DATES <- tribble(
   "gpt-5.3",             "OpenAI",     "2026-03-03", "OpenAI GPT-5.3 Instant announcement",
   "claude-opus-3",       "Anthropic",  "2024-03-04", "Anthropic Claude 3 Opus announcement",
   "claude-sonnet-3.7",   "Anthropic",  "2025-02-24", "Anthropic Claude 3.7 Sonnet announcement",
-  "claude-opus-4.6",     "Anthropic",  "2026-02-05", "Anthropic Claude Opus 4.6 announcement"
+  "claude-sonnet-4.6",   "Anthropic",  "2026-02-17", "Anthropic Claude Sonnet 4.6 announcement"
 ) |>
   mutate(
     release_date = as.Date(release_date),
-    model = factor(model, levels = MODEL_ORDER),
     family = factor(family, levels = c("OpenAI", "Anthropic"))
   )
 
-apology_timeline <- df_nc |>
-  filter(as.character(model) %in% as.character(MODEL_RELEASE_DATES$model),
-         !is.na(apology)) |>
+query_key <- function(value) {
+  value |>
+    stringi::stri_trans_nfkc() |>
+    str_squish() |>
+    stringi::stri_trans_casefold()
+}
+
+opus3_path <- file.path(
+  "..", "data", "annotations", "additional_models_expo_may2025",
+  "responses_claude-opus-3.judged.csv"
+)
+
+opus3 <- read_judged(opus3_path) |>
+  mutate(
+    apology = to_int_binary(apology),
+    parse_error = if_else(parse_error %in% c("True", "TRUE", "1"),
+                          TRUE, FALSE, missing = FALSE),
+    judge_skipped = if_else(judge_skipped %in% c("True", "TRUE", "1"),
+                            TRUE, FALSE, missing = FALSE),
+    model = as.character(model),
+    family = "Anthropic"
+  ) |>
+  filter(is.na(judge_prompt_sha256) |
+           judge_prompt_sha256 == "" |
+           judge_prompt_sha256 == PROMPT_SHA256)
+
+claude_timeline_raw <- bind_rows(
+  df |>
+    filter(as.character(model) %in% c("claude-sonnet-3.7", "claude-sonnet-4.6")) |>
+    mutate(model = as.character(model), family = "Anthropic"),
+  opus3
+) |>
+  mutate(matched_query = query_key(query))
+
+claude_shared_queries <- claude_timeline_raw |>
+  distinct(model, matched_query) |>
+  count(matched_query, name = "n_models") |>
+  filter(n_models == 3) |>
+  pull(matched_query)
+
+stopifnot(length(claude_shared_queries) == 135)
+
+claude_apology_timeline <- claude_timeline_raw |>
+  filter(
+    matched_query %in% claude_shared_queries,
+    !parse_error, !judge_skipped,
+    layer0 == "Non-compliance", !is.na(apology)
+  ) |>
   group_by(model, family) |>
   summarise(apology_rate = mean(apology), n = n(), .groups = "drop") |>
+  mutate(sample_basis = "135 shared queries")
+
+openai_apology_timeline <- df_nc |>
+  filter(as.character(model) %in% c("gpt-4o", "gpt-5", "gpt-5.3"),
+         !is.na(apology)) |>
+  mutate(model = as.character(model), family = "OpenAI") |>
+  group_by(model, family) |>
+  summarise(apology_rate = mean(apology), n = n(), .groups = "drop") |>
+  mutate(sample_basis = "complete May sample")
+
+TIMELINE_MODEL_ORDER <- c(
+  "claude-opus-3", "gpt-4o", "claude-sonnet-3.7",
+  "gpt-5", "claude-sonnet-4.6", "gpt-5.3"
+)
+
+apology_timeline <- bind_rows(openai_apology_timeline, claude_apology_timeline) |>
   left_join(MODEL_RELEASE_DATES, by = c("model", "family"))
 
 apology_events <- apology_timeline |>
@@ -653,7 +714,7 @@ apology_events <- apology_timeline |>
     # Small display offsets keep near-adjacent 2026 releases legible while
     # preserving the release-date ordering on the axis.
     plot_date = case_when(
-      as.character(model) == "claude-opus-4.6" ~ release_date - lubridate::days(24),
+      as.character(model) == "claude-sonnet-4.6" ~ release_date - lubridate::days(24),
       as.character(model) == "gpt-5.3" ~ release_date + lubridate::days(24),
       TRUE ~ release_date
     ),
@@ -664,7 +725,7 @@ apology_events <- apology_timeline |>
       as.character(model) == "gpt-5" ~ plot_date + lubridate::days(30),
       as.character(model) == "gpt-5.3" ~ plot_date + lubridate::days(45),
       as.character(model) == "claude-sonnet-3.7" ~ plot_date - lubridate::days(120),
-      as.character(model) == "claude-opus-4.6" ~ plot_date - lubridate::days(125),
+      as.character(model) == "claude-sonnet-4.6" ~ plot_date - lubridate::days(125),
       TRUE ~ plot_date
     ),
     label_y = case_when(
@@ -673,7 +734,7 @@ apology_events <- apology_timeline |>
       as.character(model) == "gpt-5" ~ apology_rate + 0.08,
       as.character(model) == "gpt-5.3" ~ apology_rate + 0.18,
       as.character(model) == "claude-sonnet-3.7" ~ apology_rate + 0.08,
-      as.character(model) == "claude-opus-4.6" ~ apology_rate + 0.09,
+      as.character(model) == "claude-sonnet-4.6" ~ apology_rate + 0.09,
       TRUE ~ apology_rate + 0.08
     )
   )
@@ -730,7 +791,8 @@ ggplot(apology_events, aes(plot_date, apology_rate, colour = family)) +
     inherit.aes = FALSE,
     hjust = 0.5,
     size = 5.4,
-    fontface = "bold"
+    fontface = "bold",
+    show.legend = FALSE
   ) +
   scale_x_date(
     breaks = apology_events |>
@@ -765,58 +827,6 @@ ggplot(apology_events, aes(plot_date, apology_rate, colour = family)) +
 ggsave("figs/apology_decay_timeline.pdf", width = 7, height = 4.8, dpi = 300)
 ```
 
-```{r apology-decay-openai-alluvial, fig.height = 4.8, fig.width = 8.5}
-openai_apology_yearly <- apology_timeline |>
-  filter(family == "OpenAI") |>
-  mutate(release_year = lubridate::year(release_date)) |>
-  group_by(release_year) |>
-  summarise(
-    apology_rate = weighted.mean(apology_rate, w = n),
-    n_models = n(),
-    n_refusals = sum(n),
-    models = paste(as.character(model), collapse = ", "),
-    .groups = "drop"
-  ) |>
-  arrange(release_year) |>
-  mutate(
-    next_year = lead(release_year),
-    next_rate = lead(apology_rate),
-    change = next_rate - apology_rate,
-    abs_change = abs(change),
-    node_label = paste0(models, "\n", percent(apology_rate, accuracy = 1))
-  )
-
-openai_alluvial <- openai_apology_yearly |>
-  transmute(
-    family = "OpenAI",
-    axis = factor(release_year, levels = c(2024, 2025, 2026)),
-    model_node = paste0(models, "\n", percent(apology_rate, accuracy = 1)),
-    apology_rate
-  )
-
-ggplot(openai_alluvial,
-       aes(x = axis, stratum = model_node, alluvium = family,
-           y = apology_rate, fill = family, label = model_node)) +
-  ggalluvial::geom_flow(alpha = 0.45, curve_type = "sigmoid",
-                        colour = "#1b9e77", linewidth = 0.2) +
-  ggalluvial::geom_stratum(width = 0.22, colour = "#1b9e77",
-                           fill = "white", linewidth = 0.8) +
-  geom_text(stat = "stratum", size = 3.2, colour = "grey15") +
-  scale_y_continuous(labels = percent_format(1),
-                     expand = expansion(mult = c(0.02, 0.08))) +
-  scale_fill_manual(values = c(OpenAI = "#1b9e77"), guide = "none") +
-  labs(x = NULL, y = "Average apology rate",
-       title = "OpenAI apology decay by release year",
-       subtitle = "Alluvial flow width represents apology rate among in-voice refusals") +
-  theme_classic(base_size = 11) +
-  theme(
-    axis.line.x = element_blank(),
-    axis.ticks.x = element_blank()
-  )
-
-ggsave("figs/apology_decay_openai_alluvial.pdf", width = 9, height = 5, dpi = 300)
-```
-
 ```{r apology-decay-table}
 apology_timeline |>
   arrange(family, release_date) |>
@@ -824,10 +834,10 @@ apology_timeline |>
     release_date = format(release_date, "%Y-%m-%d"),
     apology_rate = percent(apology_rate, accuracy = 0.1)
   ) |>
-  select(family, model, release_date, n, apology_rate, release_source) |>
+  select(family, model, release_date, sample_basis, n, apology_rate, release_source) |>
   kable(
-    col.names = c("Family", "Model", "Release date", "n in-voice NC", "Apology rate", "Release-date source"),
-    caption = "Apology-rate timeline inputs. Release dates are encoded from public model announcements."
+    col.names = c("Family", "Model", "Release date", "Sample basis", "n in-voice NC", "Apology rate", "Release-date source"),
+    caption = "Apology-rate timeline inputs. Claude models use their 135 shared queries; OpenAI models use their complete May samples."
   ) |>
   kable_styling(bootstrap_options = c("striped", "hover"), font_size = 11, full_width = FALSE)
 ```

@@ -21,6 +21,11 @@ venv/
 # Notebooks
 notebooks/.ipynb_checkpoints/
 
+# Runtime logs
+logs/
+*.log
+*.log.*
+
 # OS
 .DS_Store
 Thumbs.db

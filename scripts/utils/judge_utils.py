@@ -5,6 +5,7 @@ import csv
 import hashlib
 import json
 import os
+import re
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Union
@@ -204,6 +205,19 @@ def validate_judge_output(parsed: dict) -> dict:
     return parsed
 
 
+def retry_after_seconds(exc) -> Optional[float]:
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", {}) or {}
+    value = headers.get("retry-after") or headers.get("Retry-After")
+    if value:
+        try:
+            return float(value)
+        except ValueError:
+            pass
+    match = re.search(r"['\"]Retry-After['\"]:\s*['\"]?(\d+(?:\.\d+)?)", str(exc))
+    return float(match.group(1)) if match else None
+
+
 def retry_call(fn, max_retries: int = 3, base_delay: float = 2.0):
     last_error = None
     for attempt in range(max_retries + 1):
@@ -212,7 +226,8 @@ def retry_call(fn, max_retries: int = 3, base_delay: float = 2.0):
         except Exception as exc:
             last_error = exc
             if attempt < max_retries:
-                delay = base_delay * (2 ** attempt)
+                retry_after = retry_after_seconds(exc)
+                delay = max(base_delay * (2 ** attempt), retry_after or 0)
                 print(f"    retry {attempt + 1}/{max_retries} after {delay:.1f}s: {exc}", flush=True)
                 time.sleep(delay)
     raise last_error

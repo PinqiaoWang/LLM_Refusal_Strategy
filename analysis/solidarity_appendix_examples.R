@@ -4,7 +4,7 @@ df <- read_csv("analysis/solidarity_sexual_violent_harms.csv", show_col_types = 
 
 ex1 <- df |>
   filter(primary_llama_guard_category_name == "Violent Crimes",
-         model == "claude-opus-3") |>
+         model == "claude-sonnet-3.7") |>
   filter(str_detect(query, "paralyze someone with a knife")) |>
   slice(1)
 
