@@ -25,6 +25,26 @@ library(scales)
 library(knitr)
 library(grid)
 
+ggsave_embedded <- function(filename, plot = ggplot2::last_plot(), ...) {
+  ggplot2::ggsave(filename, plot = plot, ...)
+  gs <- Sys.which("gs")
+  if (!nzchar(gs)) {
+    stop("Ghostscript (gs) is required to embed fonts in PDF figures.")
+  }
+  embedded <- tempfile(fileext = ".pdf")
+  status <- system2(gs, c(
+    "-q", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite",
+    "-dEmbedAllFonts=true", "-dSubsetFonts=true", "-dPDFSETTINGS=/prepress",
+    paste0("-sOutputFile=", embedded), filename
+  ))
+  if (status != 0L || !file.exists(embedded) ||
+      !file.copy(embedded, filename, overwrite = TRUE)) {
+    stop("Ghostscript failed to embed fonts in ", filename)
+  }
+  unlink(embedded)
+  invisible(filename)
+}
+
 if (requireNamespace("kableExtra", quietly = TRUE)) {
   library(kableExtra)
 } else {
@@ -387,7 +407,7 @@ ggplot(l1_tbl, aes(model, prop, fill = layer1)) +
   ) +
   facet_grid(family ~., scales = "free", space = "free")
 
-ggsave("figs/layer1_rx_invoice_refusals.pdf", width=8, height=7)
+ggsave_embedded("figs/layer1_rx_invoice_refusals.pdf", width=8, height=7)
 
 ```
 
@@ -467,7 +487,7 @@ ggplot(l2_tbl, aes(feature, model)) +
   ) +
   guides(colour = guide_legend(nrow = 1, override.aes = list(alpha = 1, size = 4)))
 
-ggsave("figs/layer2_model_heatmap.pdf", width = 14, height = 7, dpi = 300)
+ggsave_embedded("figs/layer2_model_heatmap.pdf", width = 14, height = 7, dpi = 300)
 ```
 
 ## 4.2 Cross-model spread in L2 strategies
@@ -567,7 +587,7 @@ ggplot(l2_model_delta, aes(x = delta, y = fct_rev(feature), group = feature, fil
     legend.position = "bottom"
   )
 
-ggsave("figs/layer2_strategy_spread.pdf", width = 7, height = 7, dpi = 300)
+ggsave_embedded("figs/layer2_strategy_spread.pdf", width = 7, height = 7, dpi = 300)
 ```
 
 ```{r l2-strategy-spread-summary}
@@ -664,12 +684,14 @@ opus3 <- read_judged(opus3_path) |>
   ) |>
   filter(is.na(judge_prompt_sha256) |
            judge_prompt_sha256 == "" |
-           judge_prompt_sha256 == PROMPT_SHA256)
+           judge_prompt_sha256 == PROMPT_SHA256) |>
+  select(model, family, query, layer0, apology, parse_error, judge_skipped)
 
 claude_timeline_raw <- bind_rows(
   df |>
     filter(as.character(model) %in% c("claude-sonnet-3.7", "claude-sonnet-4.6")) |>
-    mutate(model = as.character(model), family = "Anthropic"),
+    mutate(model = as.character(model), family = "Anthropic") |>
+    select(model, family, query, layer0, apology, parse_error, judge_skipped),
   opus3
 ) |>
   mutate(matched_query = query_key(query))
@@ -824,7 +846,7 @@ ggplot(apology_events, aes(plot_date, apology_rate, colour = family)) +
     panel.grid.major.x = element_line(colour = "grey88", linewidth = 0.3)
   )
 
-ggsave("figs/apology_decay_timeline.pdf", width = 7, height = 4.8, dpi = 300)
+ggsave_embedded("figs/apology_decay_timeline.pdf", width = 7, height = 4.8, dpi = 300)
 ```
 
 ```{r apology-decay-table}
@@ -977,7 +999,7 @@ p_l2_harm_difference <- ggplot(l2_cat_delta, aes(feature, category, fill = delta
 
 p_l2_harm_difference
 
-ggsave("figs/l2_harm_difference_scale.pdf", plot = p_l2_harm_difference, width = 7, height = 7, dpi = 300)
+ggsave_embedded("figs/l2_harm_difference_scale.pdf", plot = p_l2_harm_difference, width = 7, height = 7, dpi = 300)
 ```
 
 ```{r l2-harm-difference-clustered, fig.height = 5.5, fig.width = 7}
@@ -1098,7 +1120,7 @@ p_l2_harm_difference_clustered <- ggplot(
 
 p_l2_harm_difference_clustered
 
-ggsave("figs/l2_harm_difference_clustered.pdf",
+ggsave_embedded("figs/l2_harm_difference_clustered.pdf",
        plot = p_l2_harm_difference_clustered,
        width = 7, height = 5.2, dpi = 300)
 ```
@@ -1350,7 +1372,7 @@ p_harm_tier_rate <- HARM_CATEGORY_RATES |>
 
 p_harm_tier_rate
 
-ggsave("figs/harm_tier_refusal_rates.pdf", plot = p_harm_tier_rate, width = 7, height = 7, dpi = 300)
+ggsave_embedded("figs/harm_tier_refusal_rates.pdf", plot = p_harm_tier_rate, width = 7, height = 7, dpi = 300)
 ```
 
 ```{r harm-tier-summary}
@@ -1407,7 +1429,7 @@ p_l2_by_human_tier <- ggplot(l2_by_human_tier, aes(feature, tier, fill = rate)) 
 
 p_l2_by_human_tier
 
-ggsave("figs/l2_by_human_harm_tier.pdf", plot = p_l2_by_human_tier, width = 7, height = 7, dpi = 300)
+ggsave_embedded("figs/l2_by_human_harm_tier.pdf", plot = p_l2_by_human_tier, width = 7, height = 7, dpi = 300)
 ```
 # Appendix: legacy / out-of-main-scope models
 

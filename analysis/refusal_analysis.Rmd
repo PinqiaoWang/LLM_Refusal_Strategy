@@ -24,6 +24,26 @@ library(scales)
 library(knitr)
 library(kableExtra)
 
+ggsave_embedded <- function(filename, plot = ggplot2::last_plot(), ...) {
+  ggplot2::ggsave(filename, plot = plot, ...)
+  gs <- Sys.which("gs")
+  if (!nzchar(gs)) {
+    stop("Ghostscript (gs) is required to embed fonts in PDF figures.")
+  }
+  embedded <- tempfile(fileext = ".pdf")
+  status <- system2(gs, c(
+    "-q", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite",
+    "-dEmbedAllFonts=true", "-dSubsetFonts=true", "-dPDFSETTINGS=/prepress",
+    paste0("-sOutputFile=", embedded), filename
+  ))
+  if (status != 0L || !file.exists(embedded) ||
+      !file.copy(embedded, filename, overwrite = TRUE)) {
+    stop("Ghostscript failed to embed fonts in ", filename)
+  }
+  unlink(embedded)
+  invisible(filename)
+}
+
 # ---- Config -----------------------------------------------------------------
 ANNOTATION_DIR <- file.path("..", "data", "annotations")
 # Current judge prompt SHA256 (from BASE_SYSTEM_PROMPT in scripts/utils/judge_config.py).
@@ -538,7 +558,7 @@ ggplot(l0_tbl_incl, aes(model, prop, fill = layer0_view)) +
     legend.box.margin = margin(t = 8, r = 0, b = 0, l = -95)
   )
 
-ggsave("figs/layer0.pdf")
+ggsave_embedded("figs/layer0.pdf")
 
 
 ```
@@ -766,8 +786,8 @@ ggplot(l1_tbl, aes(model, prop, fill = layer1)) +
   ) +
   facet_grid(family ~., scales = "free", space = "free")
 
-ggsave("figs/layer1_balanced_cohort.pdf", width=8, height=7)
-ggsave("figs/layer1.pdf", width=7, height=7)
+ggsave_embedded("figs/layer1_balanced_cohort.pdf", width=8, height=7)
+ggsave_embedded("figs/layer1.pdf", width=7, height=7)
 
 ```
 
@@ -1905,7 +1925,7 @@ flag_l2_cat |>
           legend.position = "bottom") + 
   facet_grid(category ~ .)
 
-ggsave("harm_type_model.pdf", width = 30, height = 30)
+ggsave_embedded("harm_type_model.pdf", width = 30, height = 30)
 
 ```
 
@@ -1952,7 +1972,7 @@ flag_l2_cat |>
           legend.position = "bottom") + 
   facet_grid(category ~ .)
 
-ggsave("figs/harm_type_model_subset.pdf", width = 7, height = 9)
+ggsave_embedded("figs/harm_type_model_subset.pdf", width = 7, height = 9)
 
 ```
 

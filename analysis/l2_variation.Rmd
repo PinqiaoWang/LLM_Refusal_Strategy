@@ -31,6 +31,26 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
 library(tidyverse)
 library(scales)
 library(knitr)
+
+ggsave_embedded <- function(filename, plot = ggplot2::last_plot(), ...) {
+  ggplot2::ggsave(filename, plot = plot, ...)
+  gs <- Sys.which("gs")
+  if (!nzchar(gs)) {
+    stop("Ghostscript (gs) is required to embed fonts in PDF figures.")
+  }
+  embedded <- tempfile(fileext = ".pdf")
+  status <- system2(gs, c(
+    "-q", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pdfwrite",
+    "-dEmbedAllFonts=true", "-dSubsetFonts=true", "-dPDFSETTINGS=/prepress",
+    paste0("-sOutputFile=", embedded), filename
+  ))
+  if (status != 0L || !file.exists(embedded) ||
+      !file.copy(embedded, filename, overwrite = TRUE)) {
+    stop("Ghostscript failed to embed fonts in ", filename)
+  }
+  unlink(embedded)
+  invisible(filename)
+}
 if (requireNamespace("kableExtra", quietly = TRUE)) {
   library(kableExtra)
 } else {
@@ -600,7 +620,7 @@ p_harm_mds_clustered <- ggplot(mds, aes(x, y, label = harm, colour = harm_cluste
 
 p_harm_mds_clustered
 
-ggsave("figs/harm_type_mds_clustered.pdf",
+ggsave_embedded("figs/harm_type_mds_clustered.pdf",
        plot = p_harm_mds_clustered,
        width = 7, height = 5.5, dpi = 300)
 ```
