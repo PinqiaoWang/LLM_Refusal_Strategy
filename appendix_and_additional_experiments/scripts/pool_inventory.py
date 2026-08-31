@@ -26,7 +26,7 @@ OUT = Path(__file__).resolve().parents[1] / "pool_inventory.csv"
 
 SB_CODED = PROMPTS / "sorrybench_query_candidates_llama_guard_coded.json"
 LM_CODED = PROMPTS / "lmsys_harmful_query_candidates_llama_guard_coded.json"
-FINAL = PROMPTS / "sampled_200_final_queries.json"
+EXPANSION_SEED = PROMPTS / "outdated_queries.json"
 
 
 def load(p):
@@ -46,7 +46,7 @@ def main():
     ap.add_argument("--target", type=int, default=20, help="per-category target count")
     args = ap.parse_args()
 
-    sb, lm, final = load(SB_CODED), load(LM_CODED), load(FINAL)
+    sb, lm, final = load(SB_CODED), load(LM_CODED), load(EXPANSION_SEED)
     used = {(r["source"], r["candidate_id"]) for r in final}
     current = Counter(r["primary_llama_guard_category_name"] for r in final)
 

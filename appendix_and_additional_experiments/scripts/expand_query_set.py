@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Build the expanded additional august query set.
+Build the expanded additional August query set from the superseded Set A.
 
 Target per Llama Guard 3 category is min(20, achievable ceiling).  
   * same unsafe filter (llama_guard_safety_label == "unsafe")
@@ -8,10 +8,10 @@ Target per Llama Guard 3 category is min(20, achievable ceiling).
   * same rarest-category primary assignment (multi-label prompts are charged
     to their rarest category, counted over the whole unsafe pool)
   * same LMSYS template dedup, now also deduped against templates the
-    original 200 already used in that category
+    outdated 200-query seed already used in that category
   * same RANDOM_SEED = 2026
 
---verify-pipeline re-derives the primary category of the original 200 and
+--verify-pipeline re-derives the primary category of the outdated seed and
 fails loudly if this script's reimplementation disagrees with the stored
 labels, which is the guarantee that "same pipeline" is not just a claim.
 
@@ -50,7 +50,7 @@ CAMERA = Path(__file__).resolve().parents[1]
 
 SB_CODED = PROMPTS / "sorrybench_query_candidates_llama_guard_coded.json"
 LM_CODED = PROMPTS / "lmsys_harmful_query_candidates_llama_guard_coded.json"
-FINAL_200 = PROMPTS / "sampled_200_final_queries.json"
+OUTDATED_200 = PROMPTS / "outdated_queries.json"
 OUT_JSON = PROMPTS / "sampled_expanded_final_queries.json"
 OUT_CSV = PROMPTS / "sampled_expanded_final_queries.csv"
 TABLE8 = CAMERA / "table8_expanded.csv"
@@ -64,7 +64,7 @@ def load(path):
 
 
 def keep(record):
-    """The unsafe + benign-rewrite filter used to build the original 200."""
+    """The unsafe + benign-rewrite filter used to build the outdated seed."""
     query = record.get("query", "")
     return (
         record.get("llama_guard_safety_label") == "unsafe"
@@ -116,7 +116,7 @@ def main():
 
     rng = random.Random(RANDOM_SEED)
 
-    sb, lm, final200 = load(SB_CODED), load(LM_CODED), load(FINAL_200)
+    sb, lm, final200 = load(SB_CODED), load(LM_CODED), load(OUTDATED_200)
     sb_unsafe = [r for r in sb if keep(r)]
     lm_unsafe = [r for r in lm if keep(r)]
     pools = assign_primary(sb_unsafe, lm_unsafe)
@@ -135,7 +135,7 @@ def main():
             unseen.append(key)
         elif derived[key] != r["primary_llama_guard_category"]:
             disagree.append((key, r["primary_llama_guard_category"], derived[key]))
-    print(f"pipeline check on the original 200: {len(disagree)} primary-category disagreements, "
+    print(f"pipeline check on the outdated 200-query seed: {len(disagree)} primary-category disagreements, "
           f"{len(unseen)} prompts not found in the filtered pool")
     if disagree[:5]:
         for k, was, now in disagree[:5]:
@@ -150,7 +150,7 @@ def main():
     for r in final200:
         current[r["primary_llama_guard_category"]].append(r)
 
-    # templates already spent by the original 200, per category
+    # templates already represented by the outdated seed, per category
     spent_templates = defaultdict(set)
     for r in final200:
         spent_templates[r["primary_llama_guard_category"]].add(

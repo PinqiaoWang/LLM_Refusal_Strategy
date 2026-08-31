@@ -31,7 +31,9 @@ SORRY_CODED_PATH = os.path.join(DATA_DIR, "sorrybench_query_candidates_llama_gua
 LMSYS_CODED_PATH = os.path.join(DATA_DIR, "lmsys_harmful_query_candidates_llama_guard_coded.json")
 BALANCED_CORE_PATH = os.path.join(DATA_DIR, "sampled_140_balanced_core.json")
 SUPPLEMENT_PATH = os.path.join(DATA_DIR, "sampled_60_lmsys_naturalistic.json")
-FINAL_SAMPLE_PATH = os.path.join(DATA_DIR, "sampled_200_final_queries.json")
+# This historical builder produced the superseded Set A. The final 2025 main
+# experiment set is preserved separately as sampled_200_final_queries.json.
+FINAL_SAMPLE_PATH = os.path.join(DATA_DIR, "outdated_queries.json")
 
 
 SORRY_BENCH_CATEGORY_MAP = {
