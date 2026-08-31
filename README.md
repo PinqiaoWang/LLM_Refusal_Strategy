@@ -84,6 +84,10 @@ The exact machine-readable judge specification used for the released
 annotations is preserved in [`data/judge_prompt_current.txt`](data/judge_prompt_current.txt)
 and in the per-model `.judged.prompt.txt` snapshots.
 
+The [`taxonomy_codebook.pdf`](taxonomy_codebook.pdf) was provided to the human
+annotators and is also released as a reader-facing reference. It is consistent
+with the codebook presented in Appendix A of the paper.
+
 ## Reproducing the pipeline
 
 Install the Python dependencies:
