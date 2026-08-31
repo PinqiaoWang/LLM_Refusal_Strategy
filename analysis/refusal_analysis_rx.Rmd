@@ -640,10 +640,11 @@ l2_extremes |>
 
 This view focuses only on the `apology` feature among in-voice refusals. The
 timeline uses public release dates where available. To keep the Anthropic
-series prompt-matched, Claude Opus 3, Sonnet 3.7, and Sonnet 4.6 are restricted
-to the 135 queries shared by all three models. The OpenAI series uses each
-model's complete May sample. Reasoning variants are omitted because they are
-mode/configuration variants rather than separate model generations.
+series prompt-matched, Claude Opus 3 uses the rerun on the final 200-query main
+set, which is the same set used by Sonnet 3.7 and Sonnet 4.6. The OpenAI series
+also uses each model's complete main sample. Reasoning variants are omitted
+because they are mode/configuration variants rather than separate model
+generations.
 
 ```{r apology-decay-timeline, fig.height = 4.2, fig.width = 8.8}
 MODEL_RELEASE_DATES <- tribble(
@@ -660,15 +661,8 @@ MODEL_RELEASE_DATES <- tribble(
     family = factor(family, levels = c("OpenAI", "Anthropic"))
   )
 
-query_key <- function(value) {
-  value |>
-    stringi::stri_trans_nfkc() |>
-    str_squish() |>
-    stringi::stri_trans_casefold()
-}
-
 opus3_path <- file.path(
-  "..", "data", "annotations", "additional_models_expo_may2025",
+  "..", "data", "annotations", "additional_models_expo_main200_rerun",
   "responses_claude-opus-3.judged.csv"
 )
 
@@ -693,26 +687,16 @@ claude_timeline_raw <- bind_rows(
     mutate(model = as.character(model), family = "Anthropic") |>
     select(model, family, query, layer0, apology, parse_error, judge_skipped),
   opus3
-) |>
-  mutate(matched_query = query_key(query))
-
-claude_shared_queries <- claude_timeline_raw |>
-  distinct(model, matched_query) |>
-  count(matched_query, name = "n_models") |>
-  filter(n_models == 3) |>
-  pull(matched_query)
-
-stopifnot(length(claude_shared_queries) == 135)
+)
 
 claude_apology_timeline <- claude_timeline_raw |>
   filter(
-    matched_query %in% claude_shared_queries,
     !parse_error, !judge_skipped,
     layer0 == "Non-compliance", !is.na(apology)
   ) |>
   group_by(model, family) |>
   summarise(apology_rate = mean(apology), n = n(), .groups = "drop") |>
-  mutate(sample_basis = "135 shared queries")
+  mutate(sample_basis = "complete 200-query main sample")
 
 openai_apology_timeline <- df_nc |>
   filter(as.character(model) %in% c("gpt-4o", "gpt-5", "gpt-5.3"),
@@ -720,7 +704,7 @@ openai_apology_timeline <- df_nc |>
   mutate(model = as.character(model), family = "OpenAI") |>
   group_by(model, family) |>
   summarise(apology_rate = mean(apology), n = n(), .groups = "drop") |>
-  mutate(sample_basis = "complete May sample")
+  mutate(sample_basis = "complete 200-query main sample")
 
 TIMELINE_MODEL_ORDER <- c(
   "claude-opus-3", "gpt-4o", "claude-sonnet-3.7",
@@ -859,7 +843,7 @@ apology_timeline |>
   select(family, model, release_date, sample_basis, n, apology_rate, release_source) |>
   kable(
     col.names = c("Family", "Model", "Release date", "Sample basis", "n in-voice NC", "Apology rate", "Release-date source"),
-    caption = "Apology-rate timeline inputs. Claude models use their 135 shared queries; OpenAI models use their complete May samples."
+    caption = "Apology-rate timeline inputs. All models use their complete 200-query main samples."
   ) |>
   kable_styling(bootstrap_options = c("striped", "hover"), font_size = 11, full_width = FALSE)
 ```

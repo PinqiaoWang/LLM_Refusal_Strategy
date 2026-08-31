@@ -1,97 +1,143 @@
 # How LLMs Say No
 
-**A Two-Layer Framework for Measuring Communicative Form in LLM Safety Refusals**
+Code, data, annotations, and analysis artifacts for our study of the pragmatic
+form of safety refusals in large language models.
 
-Target venue: EMNLP 2025 (May 25 deadline)
+## Authors
 
-## Overview
+- Ruoxuan Li
+- Pinqiao Wang
+- Sheng Li
+- Cameron R. Jones
 
-This repository contains the codebase for analyzing how LLMs communicate safety refusals. We propose a three-layer annotation framework:
+## Abstract
 
-- **Layer 0 (Action):** Full compliance / Partial compliance / Non-compliance
-- **Layer 1 (Refusal Basis):** Bare / Capacity-based / Policy-based / Ethics-based / Mixed
-- **Layer 2 (Communicative Form):** Feature-based taxonomy of 11 speech-act features
+Refusals are often treated as face-threatening acts in pragmatics because they
+can challenge the requester’s socially claimed self-image. Large language
+models (LLMs) are increasingly trained to refuse unsafe and inappropriate
+requests, and these refusals may harm users when models fail to manage this
+interactional cost properly. While existing work has mainly approached LLM
+non-compliance as a safety-alignment outcome, it does not provide a way to
+evaluate whether LLMs refuse appropriately across different harmful contexts.
+To study this question, we propose (to our knowledge) the first taxonomy of LLM
+refusals that is grounded in pragmatic theory. Applying this taxonomy to
+responses from 16 modern LLMs across 14 harm categories, we find that although
+models differ in how they refuse, their refusals are overall explicit and
+strongly morally evaluative, with interactional repair occurring mainly through
+offering or providing safer alternatives instead of interpersonal facework.
+This pattern is especially consequential in sensitive harm contexts, where
+overuse of negative framing may make users feel shamed or provoked, undermining
+the purpose of safe non-compliance. We therefore call for alignment evaluation
+that considers not only whether models refuse harmful requests, but also
+whether they refuse in ways that are contextually adaptive and socially
+accountable for the interactional consequences of saying no.
 
-## Repository Structure
+## Repository structure
 
+| Path | Contents |
+|---|---|
+| [`scripts/`](scripts/) | Main-experiment code for benchmark construction, response collection, human-evaluation sampling, judge selection, full-corpus judging, and validation summaries. Shared judge configuration and utilities are under `scripts/utils/`. |
+| [`data/prompts/`](data/prompts/) | Candidate pools and the sampled query sets used across the main and robustness collections. See [Query-set provenance](#query-set-provenance). |
+| [`data/responses/`](data/responses/) | Raw model responses, organized by provider and collection. JSON files retain the full structured records; CSV files provide flattened versions for inspection. |
+| [`data/annotations/`](data/annotations/) | LLM-as-judge outputs. Each model generally has a structured `.judged.json`, a flattened `.judged.csv`, and a `.judged.prompt.txt` snapshot of the judge prompt. Files directly under this directory are the primary main-analysis annotations. |
+| [`data/`](data/) | Human-adjudicated gold data, judge-selection outputs, the current judge prompt, prompts, responses, and annotations. [`data/README.md`](data/README.md) documents the validation resources in more detail. |
+| [`analysis/`](analysis/) | Post-analysis and visualization code for the main paper. The R Markdown files generate the principal descriptive statistics, appendix tables, and figures; smaller R scripts support targeted qualitative and diagnostic analyses. Generated figures are under `analysis/figs/`. |
+| [`appendix_and_additional_experiments/`](appendix_and_additional_experiments/) | Robustness analyses, cross-judge agreement analyses, dataset-expansion utilities, intermediate matrices, and appendix-specific results. The `may_august_robustness/` directory contains the May–August comparison outputs. |
+
+## Query-set provenance
+
+Two different historical 200-query samples exist in the repository. The model
+response files are the authoritative record of which prompts each model
+received.
+
+| File | Role and model coverage |
+|---|---|
+| [`data/prompts/sampled_200_final_queries.json`](data/prompts/sampled_200_final_queries.json) | **Final main query set (Set B).** This is the exact 200-query set used by all 16 models in the primary analysis. The prompt-matched Claude Opus 3 rerun also uses this set. |
+| [`data/prompts/sampled_200_main_collection_reconstructed.json`](data/prompts/sampled_200_main_collection_reconstructed.json) | A reconstruction of the same main-collection Set B from the response records, enriched with source-pool metadata. It was used to run the prompt-matched Claude Opus 3 supplementary collection. |
+| [`data/prompts/outdated_queries.json`](data/prompts/outdated_queries.json) | **Superseded query set (Set A).** This set was used by the original supplementary collections for GPT-4 Turbo, Llama 3 70B Instruct, Claude Opus 3, and Mistral 7B Instruct v0.1. It also served as the 200-query seed for the August robustness collection. |
+| [`data/prompts/sampled_expanded_final_queries.json`](data/prompts/sampled_expanded_final_queries.json) | **August robustness set.** This 262-query set contains all 200 Set A queries plus 62 additions. Relative to the final main Set B, it contains 138 shared queries and 124 different queries; Set B contains 62 queries absent from the August set. |
+
+The original Claude Opus 3 collection is retained for provenance. Its
+prompt-matched rerun and corresponding judgments are stored under:
+
+```text
+data/responses/openrouter/sampled_200/additional_models_expo/main200_rerun/
+data/annotations/additional_models_expo_main200_rerun/
 ```
-refusal-framing/
-├── configs/
-│   └── models.yaml              # Model configurations
-├── src/
-│   ├── __init__.py
-│   ├── data_collection.py       # Sample from WildChat / LMSYS-Chat-1M
-│   ├── model_inference.py       # Query LLMs and collect responses
-│   ├── layer0_classifier.py     # GPT-4o judge for FC/PC/NC
-│   ├── layer12_judge.py         # GPT-4o judge for Layer 1 + Layer 2
-│   ├── benchmark_builder.py     # Assemble benchmark prompts
-│   └── analysis.py              # Distribution analysis + figures
-├── scripts/
-│   ├── 01_build_benchmark.py    # Step 1: Assemble benchmark prompts
-│   ├── 02_collect_responses.py  # Step 2: Run model inference
-│   ├── 03_classify_layer0.py    # Step 3: Layer 0 classification
-│   ├── 04_judge_layer12.py      # Step 4: Layer 1+2 annotation
-│   └── 05_analyze.py            # Step 5: Distribution analysis
-├── data/
-│   ├── prompts/                 # Benchmark prompt sets
-│   ├── responses/               # Model responses
-│   └── annotations/             # Judge outputs
-├── notebooks/                   # Analysis notebooks
-├── docs/
-│   └── taxonomy_guideline.md    # Annotation guideline
-├── requirements.txt
-├── .gitignore
-└── README.md
-```
 
-## Quick Start
+The primary analysis remains the designated 16-model panel. Claude Opus 3 is a
+supplementary historical comparison and is used in the temporal analysis via
+its prompt-matched rerun.
+
+## Annotation layers
+
+The released judgments operationalize three levels of refusal behavior:
+
+- **Layer 0 — action:** full compliance, partial compliance, or non-compliance.
+- **Layer 1 — rationale:** the principal basis given for non-compliance, such
+  as a bare, capacity-based, policy-based, or ethics-based refusal.
+- **Layer 2 — realization and adjunct features:** linguistic and interactional
+  properties of the refusal, including explicitness, apology, solidarity,
+  negative stance, normative suggestion, and safer alternatives.
+
+The exact machine-readable judge specification used for the released
+annotations is preserved in [`data/judge_prompt_current.txt`](data/judge_prompt_current.txt)
+and in the per-model `.judged.prompt.txt` snapshots.
+
+## Reproducing the pipeline
+
+Install the Python dependencies:
 
 ```bash
-# 1. Clone and install
-git clone https://github.com/<your-org>/refusal-framing.git
-cd refusal-framing
-pip install -r requirements.txt
-
-# 2. Set API keys
-export OPENAI_API_KEY="sk-..."
-# For HuggingFace gated models:
-export HF_TOKEN="hf_..."
-
-# 3. Build benchmark prompts
-python scripts/01_build_benchmark.py
-
-# 4. Collect model responses (API models)
-python scripts/02_collect_responses.py --mode api
-
-# 5. Collect model responses (local models on GPU)
-python scripts/02_collect_responses.py --mode local
-
-# 6. Run Layer 0 classification
-python scripts/03_classify_layer0.py
-
-# 7. Run Layer 1+2 judge
-python scripts/04_judge_layer12.py
-
-# 8. Analyze results
-python scripts/05_analyze.py
+python -m pip install -r requirements.txt
 ```
 
-## Models
+The main experimental workflow is documented in
+[`scripts/README.md`](scripts/README.md). The central entry points are:
 
-| Model | Type | Purpose |
-|-------|------|---------|
-| Llama-3.1-8B | Base | Pre-alignment baseline |
-| Llama-3.1-8B-Instruct | Instruct | Post-instruction-tuning |
-| Qwen2.5-7B-Instruct | Instruct | Cross-family comparison |
-| Gemma-2-9B-IT | Instruct | Cross-family comparison |
-| GPT-4o | Closed-source | SOTA baseline |
-| Claude-3-Haiku | Closed-source | Cross-provider comparison |
+```text
+scripts/01_build_benchmark.py
+scripts/02_collect_responses.py
+scripts/03_create_human_eval_set.py
+scripts/04_compare_judge_models_on_gold.py
+scripts/05_run_full_validation_judge.py
+scripts/06_analyze_validation_judgments.py
+```
 
-## Team
-- **Ruoxuan Li** 
-- **Pinqiao Wang**
-- **Cameron** — Advisor
+API-dependent scripts read credentials from environment variables; do not
+commit local `.env` files or credentials. Use each script's `--help` option to
+inspect its current arguments before running a collection or judge job.
 
-## License
+The main post-analysis and figures are generated by:
 
-MIT
+```text
+analysis/refusal_analysis.Rmd
+analysis/refusal_analysis_rx.Rmd
+analysis/l2_variation.Rmd
+```
+
+These analyses use R packages including `tidyverse`, `jsonlite`, `scales`,
+`knitr`, and `kableExtra`. PDF figures are post-processed with Ghostscript so
+that all fonts are embedded for publication.
+
+## Robustness and additional experiments
+
+The August robustness collection repeats generation on 13 available models
+using the 262-query alternative set. The main comparison contrasts the final
+200-query Set B with the August 262-query collection, while the paired analysis
+uses their 138 shared queries. Code and outputs are located in:
+
+```text
+appendix_and_additional_experiments/scripts/may_august_robustness.py
+appendix_and_additional_experiments/may_august_robustness/
+```
+
+Additional files in `appendix_and_additional_experiments/` support query-set
+expansion, judge comparison, cross-family agreement, and appendix reporting.
+
+## Data-use note
+
+This repository contains harmful and sensitive prompts and model responses for
+safety research. Some records include explicit, violent, hateful, sexual, or
+otherwise disturbing material. Please handle and redistribute the data with
+appropriate care.
