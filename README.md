@@ -17,8 +17,11 @@
 <p align="center">
   <sup>&ast;</sup> Equal contribution.
 </p>
+
 [![Paper](https://img.shields.io/badge/Paper-alphaXiv-B31B1B)](https://www.alphaxiv.org/abs/2608.30856)
 [![Codebook](https://img.shields.io/badge/Taxonomy-Codebook-2563EB)](taxonomy_codebook.pdf)
+
+
 
 **Evaluating not only whether LLMs refuse, but how they say no.**
 
