@@ -3,11 +3,20 @@
 # How LLMs Say No
 
 ### You Shouldn’t Have Asked: A Pragmatics-Inspired Taxonomy for Evaluating LLM Refusals
+<p align="center">
+  <strong>To appear in EMNLP 2026 (Main Conference)</strong>
+</p>
 
-Ruoxuan Li<sup>*</sup> · Pinqiao Wang<sup>*</sup> · Sheng Li · Cameron R. Jones
+<p align="center">
+  Ruoxuan Li<sup>&ast;</sup> ·
+  Pinqiao Wang<sup>&ast;</sup> ·
+  Sheng Li ·
+  Cameron R. Jones
+</p>
 
-<sup>*</sup> Equal contribution.
-
+<p align="center">
+  <sup>&ast;</sup> Equal contribution.
+</p>
 [![Paper](https://img.shields.io/badge/Paper-alphaXiv-B31B1B)](https://www.alphaxiv.org/abs/2608.30856)
 [![Codebook](https://img.shields.io/badge/Taxonomy-Codebook-2563EB)](taxonomy_codebook.pdf)
 
@@ -178,8 +187,8 @@ If you use this repository, please cite the accompanying paper:
 
 **Ruoxuan Li, Pinqiao Wang, Sheng Li, and Cameron R. Jones.**  
 *You Shouldn’t Have Asked: A Pragmatics-Inspired Taxonomy for Evaluating LLM Refusals.*  
+To appear in EMNLP 2026 (Main Conference).  
 [Read the paper](https://www.alphaxiv.org/abs/2608.30856)
-
 ## Data-use note
 
 > [!WARNING]
